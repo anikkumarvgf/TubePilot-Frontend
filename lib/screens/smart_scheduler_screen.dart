@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 
 /// Smart Scheduler (UPDATE15). REAL data only.
 ///
@@ -37,7 +38,6 @@ class _Cell {
 class _SmartSchedulerScreenState extends State<SmartSchedulerScreen> {
   static const _hourLabels = ['6a', '9a', '12p', '3p', '6p', '9p', '12a', '3a'];
   static const _slotStartHour = [6, 9, 12, 15, 18, 21, 0, 3];
-
   bool _autoSlotting = false;
   bool _savingAuto = false;
   DateTime? _nextAutoSlot;
@@ -380,138 +380,141 @@ class _SmartSchedulerScreenState extends State<SmartSchedulerScreen> {
     final hasData = ranked.isNotEmpty;
     if (_selected >= best.length) _selected = 0;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('smart_scheduler_title'))),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: AppColors.purple,
-        child: ListView(padding: const EdgeInsets.all(20), children: [
-          Row(children: [
-            Expanded(child: Text(context.tr('ss_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5))),
-            const SizedBox(width: 12),
-            _pill(onTap: _pickTimezone, icon: Icons.public_rounded, text: _offsetLabel(_offset), maxWidth: 130),
-          ]),
-          const SizedBox(height: 16),
-          Row(children: [
-            Expanded(child: Text(context.tr('audience_peak_activity'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-            const SizedBox(width: 12),
-            _pill(
-              onTap: _pickRange,
-              icon: Icons.expand_more_rounded,
-              text: _rangeDays == 0 ? context.tr('ss_range_all') : context.tr('wr_last_days').replaceAll('%1', '$_rangeDays'),
-              maxWidth: 160,
-            ),
-          ]),
-          const SizedBox(height: 4),
-          Text(context.tr('ss_peak_sub'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.35)),
-          const SizedBox(height: 12),
-          if (_loading)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: LoadingView())
-          else if (_needsReconnect)
-            _box(child: Text(context.tr('sv_reconnect_msg'), style: const TextStyle(fontSize: 13, height: 1.4)))
-          else ...[
-            _heatmap(grid, max),
-            const SizedBox(height: 6),
-            Text(context.tr('ss_used').replaceAll('%1', '$used'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
-          ],
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(children: [
-              SwitchListTile(
-                value: _autoSlotting,
-                onChanged: _savingAuto ? null : _toggleAuto,
-                activeTrackColor: AppColors.purple,
-                title: Text(context.tr('auto_slotting_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                subtitle: Text(context.tr('ss_auto_sub'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.35)),
-              ),
-              if (_autoSlotting)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(_nextAutoSlot != null ? Icons.event_available_rounded : Icons.info_outline_rounded, size: 17, color: _nextAutoSlot != null ? AppColors.green : const Color(0xFFF5A623)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _nextAutoSlot != null
-                            ? context.tr('ss_auto_next').replaceAll('%1', _fmtSlot(_nextAutoSlot!))
-                            : context.tr(_autoReason == 'youtube_not_connected' ? 'sv_reconnect_msg' : 'ss_auto_nodata'),
-                        style: const TextStyle(fontSize: 12.5, height: 1.4),
-                      ),
-                    ),
-                  ]),
-                ),
-            ]),
-          ),
-          if (!_loading && !_needsReconnect) ...[
-            const SizedBox(height: 22),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('smart_scheduler_title'))),
+        body: RefreshIndicator(
+          onRefresh: _load,
+          color: AppColors.purple,
+          child: ListView(padding: const EdgeInsets.all(20), children: [
             Row(children: [
-              const Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 18),
-              const SizedBox(width: 6),
-              Expanded(child: Text(context.tr('ss_best_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-              if (best.isNotEmpty)
-                TextButton.icon(
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _slotText(best[_selected].day, best[_selected].slot)));
-                    showToast(context, context.tr('ss_time_copied'), isSuccess: true);
-                  },
-                  icon: const Icon(Icons.copy_rounded, size: 15),
-                  label: Text(context.tr('ss_copy_time')),
-                ),
+              Expanded(child: Text(context.tr('ss_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5))),
+              const SizedBox(width: 12),
+              _pill(onTap: _pickTimezone, icon: Icons.public_rounded, text: _offsetLabel(_offset), maxWidth: 130),
             ]),
-            const SizedBox(height: 10),
-            if (!hasData)
-              _box(child: Text(context.tr('ss_not_enough'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4)))
+            const SizedBox(height: 16),
+            Row(children: [
+              Expanded(child: Text(context.tr('audience_peak_activity'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+              const SizedBox(width: 12),
+              _pill(
+                onTap: _pickRange,
+                icon: Icons.expand_more_rounded,
+                text: _rangeDays == 0 ? context.tr('ss_range_all') : context.tr('wr_last_days').replaceAll('%1', '$_rangeDays'),
+                maxWidth: 160,
+              ),
+            ]),
+            const SizedBox(height: 4),
+            Text(context.tr('ss_peak_sub'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.35)),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Padding(padding: EdgeInsets.symmetric(vertical: 40), child: LoadingView())
+            else if (_needsReconnect)
+              _box(child: Text(context.tr('sv_reconnect_msg'), style: const TextStyle(fontSize: 13, height: 1.4)))
             else ...[
-              SizedBox(height: 150, child: ListView(scrollDirection: Axis.horizontal, children: [for (var i = 0; i < best.length; i++) _bestCard(i, best[i])])),
-              if (ranked.any((r) => r.n < 2))
-                Padding(padding: const EdgeInsets.only(top: 6), child: Text(context.tr('ss_small_note'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11))),
-              if (ranked.length >= 2)
-                Container(
-                  margin: const EdgeInsets.only(top: 14),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Icon(Icons.lightbulb_outline_rounded, color: AppColors.purple, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(context.tr('ss_tip_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                        const SizedBox(height: 2),
-                        Text(
-                          context.tr('ss_tip_text')
-                              .replaceAll('%1', _slotText(ranked.first.day, ranked.first.slot))
-                              .replaceAll('%2', ranked.last.rate <= 0 ? '—' : (ranked.first.rate / ranked.last.rate).toStringAsFixed(1))
-                              .replaceAll('%3', _slotText(ranked.last.day, ranked.last.slot)),
-                          style: TextStyle(fontSize: 12.5, height: 1.4, color: context.surfaces.textDim),
-                        ),
-                      ]),
-                    ),
-                  ]),
-                ),
+              _heatmap(grid, max),
+              const SizedBox(height: 6),
+              Text(context.tr('ss_used').replaceAll('%1', '$used'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
             ],
-          ],
-          const SizedBox(height: 24),
-          Text(context.tr('preview_queue'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 10),
-          if (!_loading && _queued.isEmpty)
-            EmptyView(message: context.tr('queue_empty'), icon: Icons.event_note_rounded)
-          else
-            ..._queued.map((v) {
-              final when = _earliestScheduledAt(v);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(12)),
-                child: Row(children: [
-                  const Icon(Icons.schedule_rounded, size: 18, color: AppColors.purple),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(v['title'] ?? context.tr('untitled_video'), overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
-                  if (when != null) Text(when, style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
-                ]),
-              );
-            }),
-        ]),
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(children: [
+                SwitchListTile(
+                  value: _autoSlotting,
+                  onChanged: _savingAuto ? null : _toggleAuto,
+                  activeTrackColor: AppColors.purple,
+                  title: Text(context.tr('auto_slotting_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  subtitle: Text(context.tr('ss_auto_sub'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.35)),
+                ),
+                if (_autoSlotting)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Icon(_nextAutoSlot != null ? Icons.event_available_rounded : Icons.info_outline_rounded, size: 17, color: _nextAutoSlot != null ? AppColors.green : const Color(0xFFF5A623)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _nextAutoSlot != null
+                              ? context.tr('ss_auto_next').replaceAll('%1', _fmtSlot(_nextAutoSlot!))
+                              : context.tr(_autoReason == 'youtube_not_connected' ? 'sv_reconnect_msg' : 'ss_auto_nodata'),
+                          style: const TextStyle(fontSize: 12.5, height: 1.4),
+                        ),
+                      ),
+                    ]),
+                  ),
+              ]),
+            ),
+            if (!_loading && !_needsReconnect) ...[
+              const SizedBox(height: 22),
+              Row(children: [
+                const Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text(context.tr('ss_best_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+                if (best.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _slotText(best[_selected].day, best[_selected].slot)));
+                      showToast(context, context.tr('ss_time_copied'), isSuccess: true);
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 15),
+                    label: Text(context.tr('ss_copy_time')),
+                  ),
+              ]),
+              const SizedBox(height: 10),
+              if (!hasData)
+                _box(child: Text(context.tr('ss_not_enough'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4)))
+              else ...[
+                SizedBox(height: 150, child: ListView(scrollDirection: Axis.horizontal, children: [for (var i = 0; i < best.length; i++) _bestCard(i, best[i])])),
+                if (ranked.any((r) => r.n < 2))
+                  Padding(padding: const EdgeInsets.only(top: 6), child: Text(context.tr('ss_small_note'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11))),
+                if (ranked.length >= 2)
+                  Container(
+                    margin: const EdgeInsets.only(top: 14),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Icon(Icons.lightbulb_outline_rounded, color: AppColors.purple, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(context.tr('ss_tip_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text(
+                            context.tr('ss_tip_text')
+                                .replaceAll('%1', _slotText(ranked.first.day, ranked.first.slot))
+                                .replaceAll('%2', ranked.last.rate <= 0 ? '—' : (ranked.first.rate / ranked.last.rate).toStringAsFixed(1))
+                                .replaceAll('%3', _slotText(ranked.last.day, ranked.last.slot)),
+                            style: TextStyle(fontSize: 12.5, height: 1.4, color: context.surfaces.textDim),
+                          ),
+                        ]),
+                      ),
+                    ]),
+                  ),
+              ],
+            ],
+            const SizedBox(height: 24),
+            Text(context.tr('preview_queue'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            if (!_loading && _queued.isEmpty)
+              EmptyView(message: context.tr('queue_empty'), icon: Icons.event_note_rounded)
+            else
+              ..._queued.map((v) {
+                final when = _earliestScheduledAt(v);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(12)),
+                  child: Row(children: [
+                    const Icon(Icons.schedule_rounded, size: 18, color: AppColors.purple),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(v['title'] ?? context.tr('untitled_video'), overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
+                    if (when != null) Text(when, style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                  ]),
+                );
+              }),
+          ]),
+        ),
       ),
     );
   }

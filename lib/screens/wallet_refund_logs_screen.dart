@@ -77,10 +77,36 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
     );
   }
 
+  // UPDATE22: compact pill so "Last 30 Days" never touches the border.
+  Widget _pill({required VoidCallback onTap, required IconData icon, required String text, double maxWidth = 170}) => ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            minimumSize: const Size(0, 38),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            side: BorderSide(color: context.surfaces.border),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 16),
+            const SizedBox(width: 6),
+            Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+          ]),
+        ),
+      );
+
   Widget _balanceCard() => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(18), border: Border.all(color: context.surfaces.border)),
+        decoration: BoxDecoration(
+          // Slightly translucent so the festival art stays visible behind it.
+          color: context.surfaces.card2.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: context.surfaces.border),
+        ),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(context.tr('diamond_balance_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w600)),
@@ -113,7 +139,11 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(border: Border.all(color: AppColors.green.withValues(alpha: 0.5)), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.7),
+        border: Border.all(color: AppColors.green.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
           width: 38,
@@ -155,6 +185,9 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
   }
 
   Widget _buildScreen(BuildContext context) {
+    // Clears the gesture bar / 3-button nav so the last tile is never cut.
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('wallet_refund_logs_title'))),
       body: _loading
@@ -162,15 +195,17 @@ class _WalletRefundLogsScreenState extends State<WalletRefundLogsScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               color: AppColors.purple,
-              child: ListView(padding: const EdgeInsets.all(20), children: [
+              child: ListView(padding: EdgeInsets.fromLTRB(20, 20, 20, 24 + bottomInset), children: [
                 _balanceCard(),
                 const SizedBox(height: 24),
                 Row(children: [
                   Expanded(child: Text(context.tr('auto_refund_history'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
-                  OutlinedButton.icon(
-                    onPressed: _pickRange,
-                    icon: const Icon(Icons.expand_more_rounded, size: 18),
-                    label: Text(context.tr('wr_last_days').replaceAll('%1', '$_days')),
+                  const SizedBox(width: 12),
+                  _pill(
+                    onTap: _pickRange,
+                    icon: Icons.expand_more_rounded,
+                    text: context.tr('wr_last_days').replaceAll('%1', '$_days'),
+                    maxWidth: 160,
                   ),
                 ]),
                 if (_refunds.isNotEmpty) ...[

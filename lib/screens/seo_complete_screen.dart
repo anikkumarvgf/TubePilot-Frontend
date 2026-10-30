@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 
 String _tx(BuildContext c, String key, String fallback) {
   final v = c.tr(key);
@@ -29,11 +30,9 @@ class SeoCompleteScreen extends StatefulWidget {
 class _SeoCompleteScreenState extends State<SeoCompleteScreen> {
   bool _applying = false;
   bool _applied = false;
-
   String get _oldTitle => (widget.video['title'] ?? '').toString();
   String get _oldDesc => (widget.video['description'] ?? '').toString();
   List<String> get _oldTags => ((widget.video['tags'] as List?) ?? []).map((e) => e.toString()).toList();
-
   // old text is captured once, because the shared video map is updated after apply
   late final String _beforeTitle = _oldTitle;
   late final String _beforeDesc = _oldDesc;
@@ -134,60 +133,62 @@ class _SeoCompleteScreenState extends State<SeoCompleteScreen> {
     for (var i = 0; i < rows.length; i++) {
       summary.add(rows[i]);
     }
-
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('video_seo_optimizer_title'))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        const SizedBox(height: 6),
-        Center(
-          child: Container(
-            width: 84,
-            height: 84,
-            decoration: BoxDecoration(color: (_applied ? AppColors.green : AppColors.purple).withValues(alpha: 0.12), shape: BoxShape.circle),
-            child: Icon(_applied ? Icons.check_circle_rounded : Icons.auto_awesome_rounded, size: 44, color: _applied ? AppColors.green : AppColors.purple),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('video_seo_optimizer_title'))),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          const SizedBox(height: 6),
+          Center(
+            child: Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(color: (_applied ? AppColors.green : AppColors.purple).withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(_applied ? Icons.check_circle_rounded : Icons.auto_awesome_rounded, size: 44, color: _applied ? AppColors.green : AppColors.purple),
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Center(child: Text(context.tr('so_complete_title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
-        const SizedBox(height: 6),
-        Center(child: Text(context.tr(_applied ? 'so_complete_done' : 'so_complete_sub'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4))),
-        if (summary.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.only(top: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(children: summary),
+          const SizedBox(height: 14),
+          Center(child: Text(context.tr('so_complete_title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900))),
+          const SizedBox(height: 6),
+          Center(child: Text(context.tr(_applied ? 'so_complete_done' : 'so_complete_sub'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4))),
+          if (summary.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(children: summary),
+            ),
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(_tx(context, 'so_see_changes', 'See exact changes'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+              children: [
+                if (widget.newTitle != null) _change('so_tab_title', _beforeTitle, widget.newTitle!),
+                if (widget.newDescription != null) _change('so_tab_desc', _beforeDesc, widget.newDescription!),
+                if (widget.newTags != null) _change('so_tab_tags', _beforeTags, widget.newTags!.join(', ')),
+              ],
+            ),
           ),
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text(_tx(context, 'so_see_changes', 'See exact changes'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-            children: [
-              if (widget.newTitle != null) _change('so_tab_title', _beforeTitle, widget.newTitle!),
-              if (widget.newDescription != null) _change('so_tab_desc', _beforeDesc, widget.newDescription!),
-              if (widget.newTags != null) _change('so_tab_tags', _beforeTags, widget.newTags!.join(', ')),
-            ],
+          const SizedBox(height: 14),
+          GradientButton(
+            label: context.tr(_applied ? 'so_applied_btn' : 'so_apply_yt_btn'),
+            icon: _applied ? Icons.check_rounded : Icons.cloud_upload_rounded,
+            loading: _applying,
+            onPressed: _applied ? () {} : _apply,
           ),
-        ),
-        const SizedBox(height: 14),
-        GradientButton(
-          label: context.tr(_applied ? 'so_applied_btn' : 'so_apply_yt_btn'),
-          icon: _applied ? Icons.check_rounded : Icons.cloud_upload_rounded,
-          loading: _applying,
-          onPressed: _applied ? () {} : _apply,
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(onPressed: _copyAll, icon: const Icon(Icons.copy_rounded, size: 16), label: Text(context.tr('so_copy_all_btn'))),
-        TextButton(
-          // complete -> analysis -> score -> video list
-          onPressed: () => Navigator.of(context)
-            ..pop()
-            ..pop()
-            ..pop(),
-          child: Text(context.tr('so_back_videos_btn')),
-        ),
-      ]),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(onPressed: _copyAll, icon: const Icon(Icons.copy_rounded, size: 16), label: Text(context.tr('so_copy_all_btn'))),
+          TextButton(
+            // complete -> analysis -> score -> video list
+            onPressed: () => Navigator.of(context)
+              ..pop()
+              ..pop()
+              ..pop(),
+            child: Text(context.tr('so_back_videos_btn')),
+          ),
+        ]),
+      ),
     );
   }
 }

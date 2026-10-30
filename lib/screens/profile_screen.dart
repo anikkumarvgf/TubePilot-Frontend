@@ -8,6 +8,7 @@ import '../providers/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
+import '../widgets/app_brand_background.dart';
 import 'wallet_screen.dart';
 import 'diamond_store_screen.dart';
 import 'gift_code_screen.dart';
@@ -49,10 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     'support_cat_app_bug',
     'support_cat_other',
   ];
-
   Map<String, dynamic>? _metaStatus;
   bool _loadingMeta = true;
-
   Map<String, dynamic>? _liveChannel;
   bool _loadingChannel = false;
   bool _liveChannelFetchFailed = false;
@@ -164,7 +163,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         );
       },
     );
-
     if (categoryKey == null || !mounted) return;
     await _sendSupportEmail(categoryKey);
   }
@@ -279,7 +277,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         );
       },
     );
-
     if (action == 'disconnect') await _disconnectYoutube();
     if (action == 'studio') await _openYoutubeStudio(channel);
   }
@@ -444,7 +441,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
 
   Widget _youtubeSubscriberCard(Map<String, dynamic>? cachedChannel) {
     final channel = _liveChannel ?? cachedChannel;
-
     if (channel == null) {
       return GestureDetector(
         onTap: _connectYoutube,
@@ -479,11 +475,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         ),
       );
     }
-
     final subs = channel['subscriberCount']?.toString() ?? '0';
     final title = channel['channelTitle'] ?? context.tr('up_youtube_label');
     final thumbnail = (channel['thumbnail'] ?? '').toString();
-
     return GestureDetector(
       onTap: () => _openYoutubeOptions(channel),
       child: Container(
@@ -562,123 +556,120 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     context.watch<LanguageProvider>();
-
     final auth = context.watch<AuthProvider>();
     final user = auth.user ?? {};
     final channel = user['youtubeChannel'];
-
     final facebook = _metaStatus?['facebook'];
     final instagram = _metaStatus?['instagram'];
-
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('profile_settings_title'))),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
-        children: [
-          _youtubeSubscriberCard(channel),
-          const SizedBox(height: 16),
-
-          // ---------------- Creator OS (VidIQ-style tools) ----------------
-          Text(context.tr('creator_os_section'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(children: [
-              // ⚠️ NEW — Live Streaming feature, top of Creator OS list
-              // (isse feature ki visibility zyada hogi). 'menu_live_stream'
-              // translation key app_strings.dart mein add karni hogi
-              // (jaise baaki menu keys hain — 'en': 'Live Stream',
-              // 'hi': 'लाइव स्ट्रीम', waghera).
-              _menuRow(Icons.podcasts_rounded, context.tr('menu_live_stream'), AppColors.red,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))),
-              _divider(),
-              _menuRow(Icons.auto_awesome_rounded, context.tr('menu_ai_ideas'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen()))),
-              _divider(),
-              _menuRow(Icons.title_rounded, context.tr('menu_ai_title_desc'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen()))),
-              _divider(),
-              // ⚠️ Uses translation key (multi-language support) — NOT
-              // hardcoded, so it follows the selected app language. Update
-              // the VALUE of 'menu_seo_optimizer' in app_strings.dart to
-              // "Video SEO Optimizer" (all languages) — see keys below.
-              _menuRow(Icons.query_stats_rounded, context.tr('menu_seo_optimizer'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeoOptimizerScreen()))),
-              _divider(),
-              _menuRow(Icons.radar_rounded, context.tr('menu_competitor_radar'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen()))),
-              _divider(),
-              _menuRow(Icons.calendar_month_rounded, context.tr('menu_smart_scheduler'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SmartSchedulerScreen()))),
-              _divider(),
-              _menuRow(Icons.image_search_rounded, context.tr('menu_visual_analyzer'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VisualAnalyzerScreen()))),
-              _divider(),
-              // ⚠️ Uses translation key (multi-language support) — NOT
-              // hardcoded. Update the VALUE of 'menu_channel_audit' in
-              // app_strings.dart to "Channel SEO Score" (all languages).
-              _menuRow(Icons.fact_check_rounded, context.tr('menu_channel_audit'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen()))),
-              _divider(),
-              _menuRow(Icons.video_collection_rounded, context.tr('menu_my_videos'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyVideosScreen()))),
-              _divider(),
-              _menuRow(Icons.receipt_long_rounded, context.tr('menu_wallet_refund_logs'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletRefundLogsScreen()))),
-            ]),
-          ),
-          const SizedBox(height: 20),
-
-          // ⚠️ REORDERED (Boss request — "Subscription & Wallet ko Buy
-          // Diamonds ke upar karo"): subscription_wallet row now comes
-          // FIRST, buy_diamonds row moved second. Nothing else in this
-          // block changed.
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(children: [
-              _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
-              _divider(),
-              _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
-              _divider(),
-              _menuRow(Icons.card_giftcard_rounded, context.tr('menu_gift_code'), AppColors.diamond,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),
-              _divider(),
-              _menuRow(Icons.card_giftcard_rounded, context.tr('refer_earn'), AppColors.green,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferEarnScreen()))),
-              _divider(),
-              _menuRow(Icons.notifications_rounded, context.tr('notifications'), AppColors.purpleLight,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
-              _divider(),
-              _menuRow(Icons.help_rounded, context.tr('help_support'), AppColors.purple, _openSupport),
-              if (auth.isAdmin) ...[
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('profile_settings_title'))),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+          children: [
+            _youtubeSubscriberCard(channel),
+            const SizedBox(height: 16),
+            // ---------------- Creator OS (VidIQ-style tools) ----------------
+            Text(context.tr('creator_os_section'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(children: [
+                // ⚠️ NEW — Live Streaming feature, top of Creator OS list
+                // (isse feature ki visibility zyada hogi). 'menu_live_stream'
+                // translation key app_strings.dart mein add karni hogi
+                // (jaise baaki menu keys hain — 'en': 'Live Stream',
+                // 'hi': 'लाइव स्ट्रीम', waghera).
+                _menuRow(Icons.podcasts_rounded, context.tr('menu_live_stream'), AppColors.red,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))),
                 _divider(),
-                _menuRow(Icons.admin_panel_settings_rounded, context.tr('admin_panel'), AppColors.red,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen()))),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 12),
-
-          Container(
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(children: [
-              _menuRow(Icons.info_rounded, context.tr('about'), AppColors.purpleLight,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen()))),
-              _divider(),
-              _menuRow(Icons.privacy_tip_rounded, context.tr('privacy_policy'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()))),
-              _divider(),
-              _menuRow(Icons.star_rounded, context.tr('rate_us'), AppColors.diamond,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RateUsScreen()))),
-              _divider(),
-              _menuRow(Icons.settings_rounded, context.tr('settings_menu'), AppColors.purple,
-                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-            ]),
-          ),
-          const SizedBox(height: 20),
-        ],
+                _menuRow(Icons.auto_awesome_rounded, context.tr('menu_ai_ideas'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen()))),
+                _divider(),
+                _menuRow(Icons.title_rounded, context.tr('menu_ai_title_desc'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen()))),
+                _divider(),
+                // ⚠️ Uses translation key (multi-language support) — NOT
+                // hardcoded, so it follows the selected app language. Update
+                // the VALUE of 'menu_seo_optimizer' in app_strings.dart to
+                // "Video SEO Optimizer" (all languages) — see keys below.
+                _menuRow(Icons.query_stats_rounded, context.tr('menu_seo_optimizer'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeoOptimizerScreen()))),
+                _divider(),
+                _menuRow(Icons.radar_rounded, context.tr('menu_competitor_radar'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen()))),
+                _divider(),
+                _menuRow(Icons.calendar_month_rounded, context.tr('menu_smart_scheduler'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SmartSchedulerScreen()))),
+                _divider(),
+                _menuRow(Icons.image_search_rounded, context.tr('menu_visual_analyzer'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VisualAnalyzerScreen()))),
+                _divider(),
+                // ⚠️ Uses translation key (multi-language support) — NOT
+                // hardcoded. Update the VALUE of 'menu_channel_audit' in
+                // app_strings.dart to "Channel SEO Score" (all languages).
+                _menuRow(Icons.fact_check_rounded, context.tr('menu_channel_audit'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen()))),
+                _divider(),
+                _menuRow(Icons.video_collection_rounded, context.tr('menu_my_videos'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyVideosScreen()))),
+                _divider(),
+                _menuRow(Icons.receipt_long_rounded, context.tr('menu_wallet_refund_logs'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletRefundLogsScreen()))),
+              ]),
+            ),
+            const SizedBox(height: 20),
+            // ⚠️ REORDERED (Boss request — "Subscription & Wallet ko Buy
+            // Diamonds ke upar karo"): subscription_wallet row now comes
+            // FIRST, buy_diamonds row moved second. Nothing else in this
+            // block changed.
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(children: [
+                _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
+                _divider(),
+                _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
+                _divider(),
+                _menuRow(Icons.card_giftcard_rounded, context.tr('menu_gift_code'), AppColors.diamond,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),
+                _divider(),
+                _menuRow(Icons.card_giftcard_rounded, context.tr('refer_earn'), AppColors.green,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferEarnScreen()))),
+                _divider(),
+                _menuRow(Icons.notifications_rounded, context.tr('notifications'), AppColors.purpleLight,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+                _divider(),
+                _menuRow(Icons.help_rounded, context.tr('help_support'), AppColors.purple, _openSupport),
+                if (auth.isAdmin) ...[
+                  _divider(),
+                  _menuRow(Icons.admin_panel_settings_rounded, context.tr('admin_panel'), AppColors.red,
+                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen()))),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(children: [
+                _menuRow(Icons.info_rounded, context.tr('about'), AppColors.purpleLight,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen()))),
+                _divider(),
+                _menuRow(Icons.privacy_tip_rounded, context.tr('privacy_policy'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()))),
+                _divider(),
+                _menuRow(Icons.star_rounded, context.tr('rate_us'), AppColors.diamond,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RateUsScreen()))),
+                _divider(),
+                _menuRow(Icons.settings_rounded, context.tr('settings_menu'), AppColors.purple,
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+              ]),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }

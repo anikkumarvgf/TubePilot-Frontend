@@ -19,6 +19,10 @@ import '../theme/app_theme.dart';
 ///  * [watermarkWhenNormal]  — set false for screens that have their own opaque
 ///                             Scaffold: in normal mode nothing extra is drawn
 ///                             behind them; in festival mode the image shows.
+///  * [bottomReserve]        — height (px) at the bottom that the screen covers
+///                             with its own UI (floating nav pill, button bar).
+///                             The bottom artwork (diya, flowers) is lifted above
+///                             this area so it is never hidden behind it.
 class AppBrandBackground extends StatelessWidget {
   final Widget child;
   final bool excludeFromFestival;
@@ -26,6 +30,7 @@ class AppBrandBackground extends StatelessWidget {
   final Widget? customBackground;
   final Widget? foreground;
   final bool watermarkWhenNormal;
+  final double bottomReserve;
 
   const AppBrandBackground({
     super.key,
@@ -35,7 +40,11 @@ class AppBrandBackground extends StatelessWidget {
     this.customBackground,
     this.foreground,
     this.watermarkWhenNormal = true,
+    this.bottomReserve = 0,
   });
+
+  /// Festival artwork is 1152 x 2048 (9:16).
+  static const double _artRatio = 2048 / 1152;
 
   Widget _watermarkPattern() {
     return IgnorePointer(
@@ -61,22 +70,59 @@ class AppBrandBackground extends StatelessWidget {
     );
   }
 
+  /// Why not plain BoxFit.cover: phones are taller than 9:16 (e.g. 9:20), so
+  /// cover fills the height and crops the sides — the hanging diyas get cut
+  /// at the screen edge. Instead the image is shown at FULL WIDTH. On tall
+  /// screens the top half is pinned to the top and the bottom half to the
+  /// bottom; the middle of the artwork is plain cream, which the Container
+  /// colour continues, so no seam is visible.
   Widget _imageBackground(BuildContext context, String asset) {
     final size = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
+    final w = size.width;
+    final imgH = w * _artRatio;
+    final cacheW = (w * dpr).round();
+
+    Widget fallback(BuildContext c, Object e, StackTrace? s) => _watermarkPattern();
+
+    Widget half({required bool top}) => Positioned(
+          left: 0,
+          right: 0,
+          top: top ? 0 : null,
+          bottom: top ? null : bottomReserve,
+          height: imgH / 2,
+          child: ClipRect(
+            child: Align(
+              alignment: top ? Alignment.topCenter : Alignment.bottomCenter,
+              heightFactor: 0.5,
+              child: Image.asset(
+                asset,
+                width: w,
+                fit: BoxFit.fitWidth,
+                gaplessPlayback: true,
+                cacheWidth: cacheW,
+                errorBuilder: fallback,
+              ),
+            ),
+          ),
+        );
+
+    final tallScreen = size.height > imgH * 1.02;
+
     return ExcludeSemantics(
       child: IgnorePointer(
-        child: Image.asset(
-          asset,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          gaplessPlayback: true,
-          // Decode at screen resolution only, not the full source size.
-          cacheWidth: (size.width * dpr).round(),
-          // Missing/corrupt asset → quietly fall back to the normal look.
-          errorBuilder: (context, error, stackTrace) => _watermarkPattern(),
-        ),
+        child: tallScreen
+            ? Stack(children: [half(top: true), half(top: false)])
+            // Short / wide screens: cover is fine, nothing important is cut.
+            : Image.asset(
+                asset,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                gaplessPlayback: true,
+                cacheWidth: cacheW,
+                errorBuilder: fallback,
+              ),
       ),
     );
   }

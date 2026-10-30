@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 import '../widgets/competitor_widgets.dart' show fmtCount, timeAgo;
 import 'diamond_store_screen.dart';
 import 'live_stream_screen.dart';
@@ -22,6 +23,8 @@ import 'live_stream_screen.dart';
 /// ⚠️ UPDATE (views + days ago): har video card mein title ke neeche
 /// "319 views · 146d ago" dikhta hai, bilkul Video SEO Optimizer ki tarah.
 /// Data keys: viewCount + publishedAt (publishedAt na ho to createdAt).
+enum _VidSort { newest, oldest, views }
+
 class MyVideosScreen extends StatefulWidget {
   final String? highlightVideoId;
   const MyVideosScreen({super.key, this.highlightVideoId});
@@ -38,10 +41,71 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
   String? _highlightedId;
   bool _highlightHandled = false;
 
+  // UPDATE22: search (by title) + sort filter
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+  _VidSort _sort = _VidSort.newest;
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  DateTime _dateOf(Map<String, dynamic> v) =>
+      DateTime.tryParse((v['publishedAt'] ?? v['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  num _viewsOf(Map<String, dynamic> v) => num.tryParse((v['viewCount'] ?? '').toString()) ?? -1;
+
+  List<Map<String, dynamic>> get _shown {
+    final q = _query.trim().toLowerCase();
+    final list = _videos.where((v) => q.isEmpty || (v['title'] ?? '').toString().toLowerCase().contains(q)).toList();
+    switch (_sort) {
+      case _VidSort.newest:
+        list.sort((a, b) => _dateOf(b).compareTo(_dateOf(a)));
+        break;
+      case _VidSort.oldest:
+        list.sort((a, b) => _dateOf(a).compareTo(_dateOf(b)));
+        break;
+      case _VidSort.views:
+        list.sort((a, b) => _viewsOf(b).compareTo(_viewsOf(a)));
+        break;
+    }
+    return list;
+  }
+
+  void _openSort() {
+    const labels = {
+      _VidSort.newest: 'sv_sort_new',
+      _VidSort.oldest: 'sv_sort_old',
+      _VidSort.views: 'sv_sort_views',
+    };
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 12),
+          for (final e in labels.entries)
+            ListTile(
+              title: Text(context.tr(e.value), style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: _sort == e.key ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
+              onTap: () {
+                setState(() => _sort = e.key);
+                Navigator.pop(c);
+              },
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
   }
 
   String? _idOf(Map<String, dynamic> item) {
@@ -223,6 +287,15 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Festival background wrapper — shows the shared festival image when
+    // festival mode is on, and draws nothing extra when it is off.
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: _buildScreen(context),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       // ⚠️ FIX: 'myvideos_title' key is now added to app_strings.dart, so
       // this reads from translations again instead of a hardcoded string.
@@ -239,22 +312,63 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: AppColors.purple,
-        child: _loading
-            ? const LoadingView()
-            : _videos.isEmpty
-                ? ListView(children: [
-                    const SizedBox(height: 80),
-                    EmptyView(message: context.tr('myvideos_empty'), icon: Icons.video_library_outlined),
-                  ])
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _videos.length,
-                    itemBuilder: (_, i) => _videoCard(_videos[i]),
+      body: Column(children: [
+        if (!_loading && _videos.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (t) => setState(() => _query = t),
+                  decoration: InputDecoration(
+                    hintText: context.tr('sv_search_hint'),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                    isDense: true,
                   ),
-      ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(onPressed: _openSort, tooltip: context.tr('sv_filter'), icon: const Icon(Icons.tune_rounded, color: AppColors.purple)),
+            ]),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            color: AppColors.purple,
+            child: _loading
+                ? const LoadingView()
+                : _videos.isEmpty
+                    ? ListView(children: [
+                        const SizedBox(height: 80),
+                        EmptyView(message: context.tr('myvideos_empty'), icon: Icons.video_library_outlined),
+                      ])
+                    : Builder(builder: (_) {
+                        final list = _shown;
+                        if (list.isEmpty) {
+                          return ListView(children: [
+                            const SizedBox(height: 80),
+                            EmptyView(message: context.tr('sv_no_match'), icon: Icons.search_off_rounded),
+                          ]);
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: list.length,
+                          itemBuilder: (_, i) => _videoCard(list[i]),
+                        );
+                      }),
+          ),
+        ),
+      ]),
     );
   }
 

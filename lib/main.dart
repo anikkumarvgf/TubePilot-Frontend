@@ -15,6 +15,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/meta_page_picker_screen.dart';
 import 'screens/my_videos_screen.dart';
 import 'widgets/common.dart';
+import 'widgets/app_brand_background.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -24,19 +25,14 @@ const String oneSignalAppId = '205c5c05-ad00-4e06-a8f4-d7ff9245ccfd';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ⚠️ FIX (Boss request: native white screen was showing 6-7s): keep only
-  // the FAST local read (SharedPreferences) before runApp() — this still
-  // prevents the old English-flash bug. The SLOW network-dependent
-  // Firebase/OneSignal init calls have been moved below, AFTER runApp(),
-  // so they no longer block the first Flutter frame from being drawn.
+  // Keep only the FAST local read (SharedPreferences) before runApp().
+  // Slow Firebase/OneSignal init runs after runApp() so it never blocks
+  // the first Flutter frame.
   final languageProvider = LanguageProvider();
   await languageProvider.loadSaved();
 
   runApp(TubePilotApp(languageProvider: languageProvider));
 
-  // Fire-and-forget: runs in the background while the (already-visible)
-  // Dart SplashScreen is up. Same calls, same try/catch, same behavior —
-  // only WHEN they run has changed, not WHAT they do.
   _initBackgroundServices();
 }
 
@@ -57,6 +53,46 @@ Future<void> _initBackgroundServices() async {
     debugPrint('⚠️ OneSignal init failed/skipped, continuing without diamond-alert push: $e');
   }
 }
+
+/// ⚠️ NEW — GLOBAL FESTIVAL BACKGROUND (one place for all ~40 screens).
+///
+/// Wraps every page route in AppBrandBackground, then hands over to the
+/// normal platform transition. Why here and not in MaterialApp.builder:
+/// a single background behind the Navigator would show the OLD screen
+/// through the NEW (transparent) one during page transitions. Drawing the
+/// background inside each route keeps every page opaque while animating.
+///
+/// Per-screen opt-out: a screen that wraps itself in
+/// AppBrandBackground(excludeFromFestival: true) (like Splash) or sets an
+/// explicit Scaffold(backgroundColor: ...) keeps its own look.
+class _FestivalPageTransitionsBuilder extends PageTransitionsBuilder {
+  final PageTransitionsBuilder inner;
+  const _FestivalPageTransitionsBuilder(this.inner);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return inner.buildTransitions<T>(
+      route,
+      context,
+      animation,
+      secondaryAnimation,
+      AppBrandBackground(watermarkWhenNormal: false, child: child),
+    );
+  }
+}
+
+const PageTransitionsTheme _festivalTransitions = PageTransitionsTheme(
+  builders: {
+    TargetPlatform.android: _FestivalPageTransitionsBuilder(ZoomPageTransitionsBuilder()),
+    TargetPlatform.iOS: _FestivalPageTransitionsBuilder(CupertinoPageTransitionsBuilder()),
+  },
+);
 
 class TubePilotApp extends StatefulWidget {
   final LanguageProvider languageProvider;
@@ -130,17 +166,13 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (uri.scheme != 'tubepilot') return;
 
     // ------ OAuth success callback ------ //
-    // Comes from backend/routes/youtube.js (and the equivalent Meta OAuth
-    // route) redirecting the external browser back into the app after a
-    // "Connect Channel" flow finishes: tubepilot://oauth-success?...
+    // tubepilot://oauth-success?...
     if (uri.host == 'oauth-success') {
       _handleOAuthSuccess(uri);
       return;
     }
 
     // ------ "My Videos" share deep link ------ //
-    // Comes from backend/routes/share.js's smart-link redirector, which the
-    // Share button (my_videos_screen.dart) points people to:
     // https://<backend>/v/<videoId> -> tubepilot://video/<videoId>
     if (uri.host == 'video') {
       _handleVideoDeepLink(uri);
@@ -188,17 +220,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
     }
   }
 
-  // ⚠️ NEW — handles tubepilot://video/<videoId> (opened when someone taps
-  // a link shared from the "My Videos" screen and the app IS installed).
-  // Backend's routes/share.js redirects the browser here directly; if the
-  // app is NOT installed, that same page instead falls back to the Play
-  // Store, so this handler only ever needs to cover the "app installed"
-  // case.
-  //
-  // There's no dedicated single-video detail screen yet, so this opens
-  // "My Videos" and lets that screen scroll to / highlight the matching
-  // card via the `highlightVideoId` param, rather than silently doing
-  // nothing with the id.
+  // Handles tubepilot://video/<videoId>. Opens "My Videos" and lets that
+  // screen highlight the matching card via `highlightVideoId`.
   void _handleVideoDeepLink(Uri uri) {
     if (_lastHandledUri == uri) return;
     _lastHandledUri = uri;
@@ -235,8 +258,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
               navigatorKey: navigatorKey,
               title: 'TubePilot',
               debugShowCheckedModeBanner: false,
-              theme: AppTheme.light,
-              darkTheme: AppTheme.dark,
+              theme: AppTheme.light.copyWith(pageTransitionsTheme: _festivalTransitions),
+              darkTheme: AppTheme.dark.copyWith(pageTransitionsTheme: _festivalTransitions),
               themeMode: themeProvider.themeMode,
               home: const SplashScreen(),
             ),

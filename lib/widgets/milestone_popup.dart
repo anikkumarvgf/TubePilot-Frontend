@@ -53,6 +53,7 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
   bool _working = false;
 
   String? _avatarUrl;
+  String? _handle; // UPDATE25: real YouTube @handle
 
   @override
   void initState() {
@@ -60,8 +61,23 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
     // Mark as seen the moment it is shown, so the same milestone never pops up twice.
     ApiService.instance.markMilestoneSeen('${widget.data['id']}').catchError((_) => <String, dynamic>{});
     _avatarUrl = _pickAvatar(widget.data);
-    // Milestone data has no photo -> take it from the connected YouTube channel.
-    if (_avatarUrl == null) _loadAvatarFromChannel();
+    _handle = _pickHandle(widget.data);
+    // Milestone data has no photo / handle -> take them from the connected YouTube channel.
+    if (_avatarUrl == null || _handle == null) _loadFromChannel();
+  }
+
+  static const _handleKeys = ['channelHandle', 'handle', 'customUrl'];
+
+  /// Real @handle if the API sent one (also one level deep, e.g. res['channel']).
+  String? _pickHandle(Map? m) {
+    if (m == null) return null;
+    for (final k in _handleKeys) {
+      final v = m[k];
+      if (v is String && v.trim().isNotEmpty) return v.trim();
+    }
+    final nested = m['channel'];
+    if (nested is Map) return _pickHandle(nested);
+    return null;
   }
 
   static const _avatarKeys = [
@@ -84,13 +100,19 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
     return null;
   }
 
-  Future<void> _loadAvatarFromChannel() async {
+  Future<void> _loadFromChannel() async {
     try {
       final res = await ApiService.instance.getYoutubeChannel();
-      final url = _pickAvatar(res);
-      if (url != null && mounted) setState(() => _avatarUrl = url);
+      final url = _avatarUrl == null ? _pickAvatar(res) : null;
+      final h = _handle == null ? _pickHandle(res) : null;
+      if (mounted && (url != null || h != null)) {
+        setState(() {
+          if (url != null) _avatarUrl = url;
+          if (h != null) _handle = h;
+        });
+      }
     } catch (_) {
-      // Avatar is optional; the card falls back to the letter badge.
+      // Optional; the card falls back to the logo badge / "YouTube Channel".
     }
   }
 
@@ -160,6 +182,7 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
                     type: '${d['type']}',
                     value: (d['value'] as num).toInt(),
                     channelTitle: '${d['channelTitle'] ?? ''}',
+                    channelHandle: _handle, // real handle, null -> card shows "YouTube Channel"
                     videoTitle: d['videoTitle'] as String?,
                     channelAvatarUrl: _avatarUrl,
                   ),

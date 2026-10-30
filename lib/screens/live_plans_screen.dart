@@ -1,19 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_cashfree_pg_sdk/api/cferrorresponse/cferrorresponse.dart';
-import 'package:flutter_cashfree_pg_sdk/api/cfpaymentgateway/cfpaymentgatewayservice.dart';
-import 'package:flutter_cashfree_pg_sdk/api/cfsession/cfsession.dart';
-import 'package:flutter_cashfree_pg_sdk/api/cfpayment/cfdropcheckoutpayment.dart';
-import 'package:flutter_cashfree_pg_sdk/utils/cfenums.dart';
-import 'package:flutter_cashfree_pg_sdk/utils/cfexceptions.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/payu_checkout.dart';
 import '../providers/language_provider.dart';
 
 /// Day Pass aur Month Pass dono ek hi screen mein, tab switcher ke saath.
 /// Diamond Store screen (diamond_store_screen.dart) jaisa hi structure aur
-/// design pattern follow karta hai — same Cashfree checkout flow, same
+/// design pattern follow karta hai — same PayU checkout flow, same
 /// card style, taaki poori app mein UI consistent lage.
 class LivePlansScreen extends StatefulWidget {
   const LivePlansScreen({super.key});
@@ -30,24 +24,19 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
   bool freeTrialUsed = false;
   Map<String, dynamic>? currentPlan;
   String? _payingPlanName;
-  CFEnvironment _cashfreeEnvironment = CFEnvironment.PRODUCTION;
-  Timer? _paymentTimeoutTimer;
-  static const _paymentCallbackTimeout = Duration(seconds: 90);
 
-  final CFPaymentGatewayService _cfPaymentGatewayService = CFPaymentGatewayService();
+  final PayuCheckout _payu = PayuCheckout();
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _cfPaymentGatewayService.setCallback(_onVerify, _onError);
     _load();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _paymentTimeoutTimer?.cancel();
     super.dispose();
   }
 
@@ -60,8 +49,6 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
         monthPasses = res['monthPasses'] ?? [];
         freeTrialUsed = res['freeTrialUsed'] ?? false;
         currentPlan = res['currentPlan'];
-        _cashfreeEnvironment =
-            (res['cashfreeEnvironment'] == 'SANDBOX') ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION;
       });
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -74,79 +61,20 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
     if (_payingPlanName != null) return;
     setState(() => _payingPlanName = planName);
     try {
-      final res = await ApiService.instance.createLivePlanOrder(category: category, planName: planName);
-      final orderId = res['orderId'] as String;
-      final paymentSessionId = res['paymentSessionId'] as String;
-
-      try {
-        final session = CFSessionBuilder()
-            .setEnvironment(_cashfreeEnvironment)
-            .setOrderId(orderId)
-            .setPaymentSessionId(paymentSessionId)
-            .build();
-
-        final cfDropCheckoutPayment = CFDropCheckoutPaymentBuilder().setSession(session).build();
-
-        _cfPaymentGatewayService.doPayment(cfDropCheckoutPayment);
-        _paymentTimeoutTimer?.cancel();
-        _paymentTimeoutTimer = Timer(_paymentCallbackTimeout, () {
-          if (!mounted || _payingPlanName == null) return;
-          setState(() => _payingPlanName = null);
-          showToast(context, 'Checkout didn\'t open — please check your connection and try again.', isError: true);
-        });
-      } on CFException catch (e) {
-        if (mounted) {
-          setState(() => _payingPlanName = null);
-          showToast(context, e.message ?? 'Could not open checkout.', isError: true);
-        }
+      final r = await _payu.payLivePlan(category: category, planName: planName);
+      if (!mounted) return;
+      if (r.approved) {
+        showToast(context, 'Live plan activated! 🎉', isSuccess: true);
+        _load();
+      } else if (r.status == 'pending') {
+        showToast(context, r.message, isError: false);
+      } else if (r.status != 'cancelled') {
+        showToast(context, r.message, isError: true);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _payingPlanName = null);
-        showApiError(context, e);
-      }
-    }
-  }
-
-  void _onVerify(String orderId) {
-    _paymentTimeoutTimer?.cancel();
-    _confirmWithBackend(orderId);
-  }
-
-  void _onError(CFErrorResponse errorResponse, String orderId) {
-    _paymentTimeoutTimer?.cancel();
-    _confirmWithBackend(orderId, sdkReportedError: errorResponse.getMessage());
-  }
-
-  Future<void> _confirmWithBackend(String orderId, {String? sdkReportedError}) async {
-    const maxAttempts = 6;
-    const delayBetweenAttempts = Duration(seconds: 3);
-
-    try {
-      for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-        final res = await ApiService.instance.verifyLivePlanPayment(orderId);
-        final status = res['status'];
-
-        if (status == 'approved') {
-          if (mounted) {
-            showToast(context, 'Live plan activated! 🎉', isSuccess: true);
-            _load();
-          }
-          return;
-        }
-        if (status == 'rejected') {
-          if (mounted) showToast(context, sdkReportedError ?? 'Payment was not completed.', isError: true);
-          return;
-        }
-        if (attempt < maxAttempts) await Future.delayed(delayBetweenAttempts);
-      }
-      if (mounted) {
-        showToast(context, 'Payment is taking longer than usual — it will activate automatically once confirmed.', isError: false);
-      }
-    } catch (e) {
+      debugPrint('[PayU/Live] Buy failed: $e');
       if (mounted) showApiError(context, e);
     } finally {
-      _paymentTimeoutTimer?.cancel();
       if (mounted) setState(() => _payingPlanName = null);
     }
   }

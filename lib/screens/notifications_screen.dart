@@ -4,6 +4,7 @@ import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
+import '../widgets/app_brand_background.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -14,7 +15,6 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<dynamic> notifications = [];
   bool loading = true;
-
   // Real Material icons per notification type, replacing the previous
   // emoji-only icons — each gets its own color too, so the icon itself
   // communicates status (green = success, red = failure, amber = pending/
@@ -120,91 +120,93 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('notifications')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.done_all),
-            tooltip: context.tr('mark_all_read_tooltip'),
-            onPressed: _markAllRead,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_rounded),
-            tooltip: context.tr('delete_all_tooltip'),
-            onPressed: notifications.isEmpty ? null : _deleteAll,
-          ),
-        ],
-      ),
-      body: loading
-          ? const LoadingView()
-          : notifications.isEmpty
-              ? Center(child: EmptyView(message: context.tr('no_notifications_yet'), icon: Icons.notifications_none))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: notifications.length,
-                    itemBuilder: (_, i) {
-                      final n = notifications[i];
-                      final id = (n['_id'] ?? n['id'] ?? '').toString();
-                      final (icon, iconColor) = _typeIcons[n['type']] ?? _defaultIcon;
-
-                      return Dismissible(
-                        key: ValueKey(id.isNotEmpty ? id : i),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(14)),
-                          child: const Icon(Icons.delete_rounded, color: Colors.white),
-                        ),
-                        onDismissed: id.isEmpty ? null : (_) => _deleteOne(id, i),
-                        child: Opacity(
-                          opacity: n['isRead'] == true ? 0.6 : 1,
-                          child: Container(
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(context.tr('notifications')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.done_all),
+              tooltip: context.tr('mark_all_read_tooltip'),
+              onPressed: _markAllRead,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded),
+              tooltip: context.tr('delete_all_tooltip'),
+              onPressed: notifications.isEmpty ? null : _deleteAll,
+            ),
+          ],
+        ),
+        body: loading
+            ? const LoadingView()
+            : notifications.isEmpty
+                ? Center(child: EmptyView(message: context.tr('no_notifications_yet'), icon: Icons.notifications_none))
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: notifications.length,
+                      itemBuilder: (_, i) {
+                        final n = notifications[i];
+                        final id = (n['_id'] ?? n['id'] ?? '').toString();
+                        final (icon, iconColor) = _typeIcons[n['type']] ?? _defaultIcon;
+                        return Dismissible(
+                          key: ValueKey(id.isNotEmpty ? id : i),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
                             margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 36, height: 36,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
-                                  child: Icon(icon, color: iconColor, size: 18),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(n['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                                      const SizedBox(height: 4),
-                                      Text(n['message'] ?? '', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
-                                      const SizedBox(height: 4),
-                                      Text(formatDateTime(n['createdAt']), style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
-                                    ],
+                            decoration: BoxDecoration(color: AppColors.red, borderRadius: BorderRadius.circular(14)),
+                            child: const Icon(Icons.delete_rounded, color: Colors.white),
+                          ),
+                          onDismissed: id.isEmpty ? null : (_) => _deleteOne(id, i),
+                          child: Opacity(
+                            opacity: n['isRead'] == true ? 0.6 : 1,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 36, height: 36,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+                                    child: Icon(icon, color: iconColor, size: 18),
                                   ),
-                                ),
-                                if (id.isNotEmpty)
-                                  IconButton(
-                                    icon: Icon(Icons.close_rounded, size: 18, color: context.surfaces.textDim),
-                                    tooltip: context.tr('delete'),
-                                    onPressed: () => _deleteOne(id, i),
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(n['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                        const SizedBox(height: 4),
+                                        Text(n['message'] ?? '', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
+                                        const SizedBox(height: 4),
+                                        Text(formatDateTime(n['createdAt']), style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
+                                      ],
+                                    ),
                                   ),
-                              ],
+                                  if (id.isNotEmpty)
+                                    IconButton(
+                                      icon: Icon(Icons.close_rounded, size: 18, color: context.surfaces.textDim),
+                                      tooltip: context.tr('delete'),
+                                      onPressed: () => _deleteOne(id, i),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
+      ),
     );
   }
 }

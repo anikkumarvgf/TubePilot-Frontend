@@ -5,6 +5,9 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
+import '../widgets/app_brand_background.dart';
+import '../widgets/diwali_decor.dart';
+import '../widgets/diwali_popups.dart';
 
 /// Checks the backend for whether the weekly Rate Us prompt should be shown,
 /// and if so, presents it as a bottom sheet. Safe to call after any screen
@@ -14,23 +17,14 @@ Future<void> maybeShowRateUsPopup(BuildContext context) async {
     final res = await ApiService.instance.getRatingStatus();
     if (res['shouldShow'] != true) return;
     if (!context.mounted) return;
-    await showModalBottomSheet(
+    // Diwali cream popup (same RateUsBody inside DiwaliPopupShell).
+    await showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      // ⚠️ FIX (overflow): RateUsBody has a star row + AI-suggested review
-      // TextField + email field + submit button — tall enough, especially
-      // with the keyboard open for the review field, to overflow a
-      // non-scrollable modal ("BOTTOM OVERFLOWED BY N PIXELS"). Wrapped in
-      // a SingleChildScrollView with keyboard-aware bottom padding, same
-      // pattern already used correctly by every other bottom sheet in the
-      // app (profile_screen.dart, settings_screen.dart, upload_screen.dart).
-      builder: (sheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
-          child: const RateUsBody(isPopup: true),
-        ),
+      barrierColor: Colors.black54,
+      builder: (dialogContext) => DiwaliPopupShell(
+        onClose: () => Navigator.of(dialogContext).maybePop(),
+        padding: const EdgeInsets.fromLTRB(10, 22, 10, 6),
+        child: const RateUsBody(isPopup: true),
       ),
     );
   } catch (_) {
@@ -40,12 +34,14 @@ Future<void> maybeShowRateUsPopup(BuildContext context) async {
 
 class RateUsScreen extends StatelessWidget {
   const RateUsScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('rate_us_title'))),
-      body: const RateUsBody(isPopup: false),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('rate_us_title'))),
+        body: const RateUsBody(isPopup: false),
+      ),
     );
   }
 }
@@ -55,7 +51,6 @@ class RateUsScreen extends StatelessWidget {
 class RateUsBody extends StatefulWidget {
   final bool isPopup;
   const RateUsBody({super.key, required this.isPopup});
-
   @override
   State<RateUsBody> createState() => _RateUsBodyState();
 }
@@ -67,10 +62,8 @@ class _RateUsBodyState extends State<RateUsBody> {
   bool _reviewManuallyEdited = false;
   bool _loadingExisting = true;
   Map<String, dynamic>? _savedRating;
-
   late final TextEditingController _reviewCtrl;
   late final TextEditingController _emailCtrl;
-
   // Values are translation KEYS now (not display text) — resolved via
   // context.tr() in build() so the star label follows the selected language.
   static const _starLabelKeys = {1: 'star_poor', 2: 'star_fair', 3: 'star_good', 4: 'star_great', 5: 'star_excellent'};
@@ -156,43 +149,60 @@ class _RateUsBodyState extends State<RateUsBody> {
     if (mounted) Navigator.of(context).maybePop();
   }
 
+  // Popup = Diwali cream colours; full page = app theme as before.
+  bool get _p => widget.isPopup;
+  Color get _text => _p ? DiwaliColors.purpleDark : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black);
+  Color get _dim => _p ? DiwaliColors.textDim : context.surfaces.textDim;
+  Color get _accent => _p ? DiwaliColors.purple : AppColors.purple;
+  Color get _starOn => _p ? DiwaliColors.gold : AppColors.diamond;
+
+  InputDecoration _deco({String? hint, Widget? prefix}) {
+    if (!_p) return InputDecoration(hintText: hint, prefixIcon: prefix);
+    OutlineInputBorder b(Color c, [double w = 1]) =>
+        OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: c, width: w));
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: prefix,
+      hintStyle: const TextStyle(color: DiwaliColors.textDim, fontSize: 13),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.7),
+      counterStyle: const TextStyle(color: DiwaliColors.textDim),
+      border: b(DiwaliColors.cardBorder),
+      enabledBorder: b(DiwaliColors.cardBorder),
+      focusedBorder: b(DiwaliColors.purple, 1.4),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingExisting) {
       return const Padding(
         padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator(color: AppColors.purple)),
+        child: Center(child: CircularProgressIndicator(color: DiwaliColors.purple)),
       );
     }
-
     if (_savedRating != null) {
       return _buildSavedCard(_savedRating!);
     }
-
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, widget.isPopup ? 12 : 20, 20, 20),
+      padding: EdgeInsets.fromLTRB(widget.isPopup ? 14 : 20, widget.isPopup ? 6 : 20, widget.isPopup ? 14 : 20, widget.isPopup ? 12 : 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.isPopup)
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999)),
-              ),
-            ),
           Container(
             width: 64, height: 64,
-            decoration: BoxDecoration(gradient: AppColors.gradient, shape: BoxShape.circle),
-            child: const Center(child: Icon(Icons.star_rounded, color: Colors.white, size: 30)),
+            decoration: BoxDecoration(
+              gradient: _p ? const LinearGradient(colors: [DiwaliColors.purple, DiwaliColors.purpleDark]) : AppColors.gradient,
+              shape: BoxShape.circle,
+              border: _p ? Border.all(color: DiwaliColors.goldLight, width: 1.5) : null,
+            ),
+            child: Center(child: Icon(Icons.star_rounded, color: _p ? DiwaliColors.goldLight : Colors.white, size: 30)),
           ),
           const SizedBox(height: 14),
-          Text(context.tr('enjoying_app'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(context.tr('enjoying_app'), textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _p ? _text : null)),
           const SizedBox(height: 6),
-          Text(context.tr('let_us_know'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+          Text(context.tr('let_us_know'), textAlign: TextAlign.center, style: TextStyle(color: _dim, fontSize: 13)),
           const SizedBox(height: 24),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(5, (i) {
@@ -204,7 +214,7 @@ class _RateUsBodyState extends State<RateUsBody> {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Icon(
                     filled ? Icons.star_rounded : Icons.star_border_rounded,
-                    color: filled ? AppColors.diamond : context.surfaces.textDim,
+                    color: filled ? _starOn : _dim,
                     size: 38,
                   ),
                 ),
@@ -215,17 +225,16 @@ class _RateUsBodyState extends State<RateUsBody> {
           // ("4 stars") reads as an actual sentiment ("Great").
           if (_stars > 0) ...[
             const SizedBox(height: 8),
-            Text(context.tr(_starLabelKeys[_stars] ?? ''), style: const TextStyle(color: AppColors.diamond, fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(context.tr(_starLabelKeys[_stars] ?? ''), style: TextStyle(color: _starOn, fontSize: 13, fontWeight: FontWeight.w700)),
           ],
           const SizedBox(height: 20),
-
           Row(children: [
-            Text(context.tr('your_review'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+            Text(context.tr('your_review'), style: TextStyle(color: _dim, fontSize: 13)),
             const SizedBox(width: 8),
             if (_loadingSuggestion) ...[
-              const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.purple)),
+              SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: _accent)),
               const SizedBox(width: 6),
-              Text(context.tr('ai_writing_suggestion'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+              Text(context.tr('ai_writing_suggestion'), style: TextStyle(color: _dim, fontSize: 11.5)),
             ],
           ]),
           const SizedBox(height: 6),
@@ -233,26 +242,29 @@ class _RateUsBodyState extends State<RateUsBody> {
             controller: _reviewCtrl,
             maxLines: 4,
             maxLength: 500,
+            style: TextStyle(color: _p ? _text : null),
             onChanged: (_) => _reviewManuallyEdited = true,
-            decoration: InputDecoration(hintText: context.tr('review_hint')),
+            decoration: _deco(hint: context.tr('review_hint')),
           ),
           const SizedBox(height: 6),
-
-          Text(context.tr('your_email'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+          Text(context.tr('your_email'), style: TextStyle(color: _dim, fontSize: 13)),
           const SizedBox(height: 6),
           TextField(
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(hintText: 'you@example.com', prefixIcon: Icon(Icons.email_outlined, size: 18)),
+            style: TextStyle(color: _p ? _text : null),
+            decoration: _deco(hint: 'you@example.com', prefix: const Icon(Icons.email_outlined, size: 18)),
           ),
           const SizedBox(height: 24),
-
-          GradientButton(label: context.tr('save_rating'), loading: _submitting, onPressed: _submit),
+          if (_p)
+            DiwaliButton(label: context.tr('save_rating'), loading: _submitting, onTap: _submit)
+          else
+            GradientButton(label: context.tr('save_rating'), loading: _submitting, onPressed: _submit),
           const SizedBox(height: 10),
           Center(
             child: TextButton(
               onPressed: _skip,
-              child: Text(context.tr('skip'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+              child: Text(context.tr('skip'), style: TextStyle(color: _dim, fontSize: 13)),
             ),
           ),
         ],
@@ -264,56 +276,47 @@ class _RateUsBodyState extends State<RateUsBody> {
     final stars = rating['stars'] ?? 0;
     final review = rating['reviewText'] ?? '';
     final email = rating['email'] ?? '';
-
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (widget.isPopup)
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999)),
-              ),
-            ),
           const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 40),
           const SizedBox(height: 12),
-          Text(context.tr('thanks_for_feedback'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(context.tr('thanks_for_feedback'), textAlign: TextAlign.center, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _p ? _text : null)),
           const SizedBox(height: 20),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: context.surfaces.card2,
+              color: _p ? Colors.white.withValues(alpha: 0.55) : context.surfaces.card2,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: context.surfaces.border),
+              border: Border.all(color: _p ? DiwaliColors.cardBorder : context.surfaces.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
-                  const Icon(Icons.email_outlined, size: 16),
+                  Icon(Icons.email_outlined, size: 16, color: _p ? _text : null),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(email, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                  Expanded(child: Text(email, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _p ? _text : null))),
                 ]),
                 const SizedBox(height: 10),
                 Row(
                   children: List.generate(5, (i) => Icon(
                         i < stars ? Icons.star_rounded : Icons.star_border_rounded,
-                        color: AppColors.diamond,
+                        color: _starOn,
                         size: 20,
                       )),
                 ),
                 const SizedBox(height: 10),
-                Text(review, style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4)),
+                Text(review, style: TextStyle(color: _dim, fontSize: 13, height: 1.4)),
               ],
             ),
           ),
           const SizedBox(height: 16),
           if (widget.isPopup)
-            TextButton(onPressed: () => Navigator.of(context).maybePop(), child: Text(context.tr('close'))),
+            TextButton(onPressed: () => Navigator.of(context).maybePop(), child: Text(context.tr('close'), style: TextStyle(color: _accent))),
         ],
       ),
     );

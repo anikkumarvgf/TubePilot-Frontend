@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/thumb_metrics.dart';
+import '../widgets/app_brand_background.dart';
 
 /// Visual Analyzer - steps 3-5: pick the improved thumbnail from the gallery
 /// (made in ChatGPT or anywhere), preview it next to the current one with its
@@ -72,69 +73,75 @@ class _ThumbnailUploadScreenState extends State<ThumbnailUploadScreen> {
     if (_done) return _success();
     final url = (widget.video['thumbnailHigh'] ?? widget.video['thumbnail'] ?? '').toString();
     final cur = Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2));
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('va_upload_title'))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        GestureDetector(
-          onTap: _pick,
-          child: Container(
-            height: 150,
-            decoration: BoxDecoration(border: Border.all(color: AppColors.purple), borderRadius: BorderRadius.circular(16)),
-            child: _file == null
-                ? Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.add_photo_alternate_rounded, color: AppColors.purple, size: 32),
-                      const SizedBox(height: 8),
-                      Text(context.tr('va_pick_gallery'), style: const TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text(context.tr('va_pick_rules'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
-                    ]),
-                  )
-                : ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(_file!, fit: BoxFit.cover, width: double.infinity)),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('va_upload_title'))),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          GestureDetector(
+            onTap: _pick,
+            child: Container(
+              height: 150,
+              decoration: BoxDecoration(border: Border.all(color: AppColors.purple), borderRadius: BorderRadius.circular(16)),
+              child: _file == null
+                  ? Center(
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.add_photo_alternate_rounded, color: AppColors.purple, size: 32),
+                        const SizedBox(height: 8),
+                        Text(context.tr('va_pick_gallery'), style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text(context.tr('va_pick_rules'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                      ]),
+                    )
+                  : ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(_file!, fit: BoxFit.cover, width: double.infinity)),
+            ),
           ),
-        ),
-        if (_file != null) ...[
-          const SizedBox(height: 18),
-          Text(context.tr('va_preview_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-          const SizedBox(height: 10),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _frame('va_current', cur, widget.currentMetrics),
-            const SizedBox(width: 12),
-            _frame('va_new', Image.file(_file!, fit: BoxFit.cover), _newM),
-          ]),
-          const SizedBox(height: 6),
-          Text(context.tr('so_thumb_note'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
-          const SizedBox(height: 18),
-          GradientButton(label: context.tr('so_apply_yt_btn'), icon: Icons.cloud_upload_rounded, loading: _applying, onPressed: _apply),
-          TextButton(onPressed: _pick, child: Text(context.tr('va_change_image'))),
-        ],
-      ]),
+          if (_file != null) ...[
+            const SizedBox(height: 18),
+            Text(context.tr('va_preview_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 10),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _frame('va_current', cur, widget.currentMetrics),
+              const SizedBox(width: 12),
+              _frame('va_new', Image.file(_file!, fit: BoxFit.cover), _newM),
+            ]),
+            const SizedBox(height: 6),
+            Text(context.tr('so_thumb_note'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
+            const SizedBox(height: 18),
+            GradientButton(label: context.tr('so_apply_yt_btn'), icon: Icons.cloud_upload_rounded, loading: _applying, onPressed: _apply),
+            TextButton(onPressed: _pick, child: Text(context.tr('va_change_image'))),
+          ],
+        ]),
+      ),
     );
   }
 
   Widget _success() {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('va_upload_title')), automaticallyImplyLeading: false),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(width: 84, height: 84, decoration: BoxDecoration(color: AppColors.green.withValues(alpha: 0.12), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 48)),
-          const SizedBox(height: 16),
-          Text(context.tr('va_success_title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 8),
-          Text(context.tr('va_success_sub'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4)),
-          const SizedBox(height: 18),
-          ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(width: 240, child: AspectRatio(aspectRatio: 16 / 9, child: Image.file(_file!, fit: BoxFit.cover)))),
-          const SizedBox(height: 24),
-          GradientButton(
-            label: context.tr('so_back_videos_btn'),
-            icon: Icons.video_library_rounded,
-            // upload -> analysis -> video list
-            onPressed: () => Navigator.of(context)
-              ..pop()
-              ..pop(),
-          ),
-        ]),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('va_upload_title')), automaticallyImplyLeading: false),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(width: 84, height: 84, decoration: BoxDecoration(color: AppColors.green.withValues(alpha: 0.12), shape: BoxShape.circle), child: const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 48)),
+            const SizedBox(height: 16),
+            Text(context.tr('va_success_title'), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            Text(context.tr('va_success_sub'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.4)),
+            const SizedBox(height: 18),
+            ClipRRect(borderRadius: BorderRadius.circular(12), child: SizedBox(width: 240, child: AspectRatio(aspectRatio: 16 / 9, child: Image.file(_file!, fit: BoxFit.cover)))),
+            const SizedBox(height: 24),
+            GradientButton(
+              label: context.tr('so_back_videos_btn'),
+              icon: Icons.video_library_rounded,
+              // upload -> analysis -> video list
+              onPressed: () => Navigator.of(context)
+                ..pop()
+                ..pop(),
+            ),
+          ]),
+        ),
       ),
     );
   }

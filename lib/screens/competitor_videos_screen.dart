@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/competitor_widgets.dart';
+import '../widgets/app_brand_background.dart';
 
 /// Video performance list: Most Viewed / Recent / Fastest Growing / Beating Average.
 /// For ONE competitor (competitorId given) or all tracked competitors together.
@@ -15,7 +16,6 @@ class CompetitorVideosScreen extends StatefulWidget {
   final String? title;
   final String initialSort;
   const CompetitorVideosScreen({super.key, this.competitorId, this.title, this.initialSort = 'most_viewed'});
-
   @override
   State<CompetitorVideosScreen> createState() => _CompetitorVideosScreenState();
 }
@@ -28,7 +28,6 @@ class _CompetitorVideosScreenState extends State<CompetitorVideosScreen> {
     'fastest': 'rd_tab_fastest',
     'outperforming': 'rd_tab_outperforming',
   };
-
   late String _sort;
   bool _loading = true;
   bool _locked = false;
@@ -82,42 +81,45 @@ class _CompetitorVideosScreenState extends State<CompetitorVideosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title ?? context.tr('rd_videos_title'))),
-      body: Column(
-        children: [
-          SizedBox(
-            height: 56,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-              itemCount: _sorts.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final s = _sorts[i];
-                final selected = s == _sort;
-                return InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: () => _select(s),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.purple : context.surfaces.card2,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: selected ? AppColors.purple : context.surfaces.border),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(widget.title ?? context.tr('rd_videos_title'))),
+        body: Column(
+          children: [
+            SizedBox(
+              height: 56,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                itemCount: _sorts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final s = _sorts[i];
+                  final selected = s == _sort;
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => _select(s),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.purple : context.surfaces.card2,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: selected ? AppColors.purple : context.surfaces.border),
+                      ),
+                      child: Text(
+                        context.tr(_sortKeys[s]!),
+                        style: TextStyle(color: selected ? Colors.white : null, fontWeight: FontWeight.w700, fontSize: 12.5),
+                      ),
                     ),
-                    child: Text(
-                      context.tr(_sortKeys[s]!),
-                      style: TextStyle(color: selected ? Colors.white : null, fontWeight: FontWeight.w700, fontSize: 12.5),
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          Expanded(child: _body()),
-        ],
+            Expanded(child: _body()),
+          ],
+        ),
       ),
     );
   }

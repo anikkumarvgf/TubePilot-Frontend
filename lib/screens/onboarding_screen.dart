@@ -29,7 +29,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnboardingStep(Icons.phonelink_off_rounded, 'assets/onboarding_anywhere.png', 'onboarding_title_2', 'onboarding_desc_2'),
     _OnboardingStep(Icons.auto_awesome_rounded, 'assets/onboarding_ai.png', 'onboarding_title_3', 'onboarding_desc_3'),
   ];
-
   int _step = 0;
   late final PageController _pageController;
 
@@ -57,11 +56,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // ⚠️ FIX (Boss request): same off-white base + watermark as Splash.
-      backgroundColor: const Color(0xFFFAF7FC),
-      body: AppBrandBackground(
-        child: SafeArea(
+    return AppBrandBackground(
+      // Onboarding keeps the normal watermark when festival is off
+      // (same look as Splash). Festival image appears when festival mode is on.
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(

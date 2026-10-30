@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 import 'live_camera_screen.dart';
 import 'live_plans_screen.dart';
 
@@ -352,19 +353,24 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
   // ---------------- build ----------------
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.tr('live_title')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.workspace_premium_rounded),
-            tooltip: context.tr('live_plans_tooltip'),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LivePlansScreen())),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: _stage == _LiveStage.live ? _buildLiveView() : _buildSetupView(),
+    // Festival background wrapper — festival mode on ho to Diwali image,
+    // off ho to koi extra background nahi.
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(context.tr('live_title')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.workspace_premium_rounded),
+              tooltip: context.tr('live_plans_tooltip'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LivePlansScreen())),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: _stage == _LiveStage.live ? _buildLiveView() : _buildSetupView(),
+        ),
       ),
     );
   }
@@ -853,28 +859,33 @@ class _LiveOldVideosScreenState extends State<LiveOldVideosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('live_old_title'))),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        color: AppColors.purple,
-        child: _loading
-            ? const LoadingView()
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  LiveLimitBanner(limits: _limits, waitSeconds: _waitSeconds),
-                  const SizedBox(height: 14),
-                  if (_limits.activeStream != null && _limits.activeStream!['source'] != 'camera') ...[
-                    _liveNowCard(),
+    // Festival background wrapper — festival mode on ho to Diwali image,
+    // off ho to koi extra background nahi.
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('live_old_title'))),
+        body: RefreshIndicator(
+          onRefresh: _load,
+          color: AppColors.purple,
+          child: _loading
+              ? const LoadingView()
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    LiveLimitBanner(limits: _limits, waitSeconds: _waitSeconds),
                     const SizedBox(height: 14),
+                    if (_limits.activeStream != null && _limits.activeStream!['source'] != 'camera') ...[
+                      _liveNowCard(),
+                      const SizedBox(height: 14),
+                    ],
+                    if (_videos.isEmpty)
+                      EmptyView(message: context.tr('live_old_empty'), icon: Icons.video_library_outlined)
+                    else
+                      ..._videos.map(_videoCard),
                   ],
-                  if (_videos.isEmpty)
-                    EmptyView(message: context.tr('live_old_empty'), icon: Icons.video_library_outlined)
-                  else
-                    ..._videos.map(_videoCard),
-                ],
-              ),
+                ),
+        ),
       ),
     );
   }

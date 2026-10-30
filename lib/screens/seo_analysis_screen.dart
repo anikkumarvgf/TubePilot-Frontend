@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/thumb_metrics.dart';
+import '../widgets/app_brand_background.dart';
 import 'diamond_store_screen.dart';
 import 'seo_complete_screen.dart';
 
@@ -16,9 +17,7 @@ String seoTx(BuildContext c, String key, String fallback) {
 }
 
 const Color _kAmber = Color(0xFFF5A623);
-
 Color seoBandColor(int? s) => s == null ? Colors.grey : (s > 70 ? AppColors.green : (s >= 50 ? _kAmber : AppColors.red));
-
 String seoBandLabel(BuildContext c, int? s) =>
     s == null ? '—' : c.tr(s > 70 ? 'seo_band_strong' : (s >= 50 ? 'seo_band_needs_work' : 'seo_band_weak'));
 
@@ -42,13 +41,11 @@ SeoQuick seoLocalScores({required String title, required String desc, required L
       .split(RegExp(r'[^\p{L}\p{M}\p{N}]+', unicode: true))
       .where((w) => w.runes.length > 2)
       .toSet();
-
   final t = title.trim();
   final d = desc.trim();
   final tw = words(t);
   final tagWords = tags.expand((x) => words(x)).toSet();
   final dHead = words(String.fromCharCodes(d.runes.take(150)));
-
   // Title: length 40, number 15, keyword match 25, structure (| : - ? ! ( ) ) 20
   var ts = 0;
   final tl = t.runes.length;
@@ -63,7 +60,6 @@ SeoQuick seoLocalScores({required String title, required String desc, required L
   final kwPool = tagWords.isNotEmpty ? tagWords : dHead;
   if (tw.any(kwPool.contains)) ts += 25;
   if (RegExp(r'[|:\-–?!()]').hasMatch(t)) ts += 20;
-
   // Description: length 40, link 15, 1-3 hashtags 15, keyword in first lines 15, 3+ lines 15
   var ds = 0;
   final dl = d.runes.length;
@@ -85,7 +81,6 @@ SeoQuick seoLocalScores({required String title, required String desc, required L
   }
   if (tw.any(dHead.contains)) ds += 15;
   if (d.split('\n').where((l) => l.trim().isNotEmpty).length >= 3) ds += 15;
-
   // Tags: count 50, within 500 chars 15, relevance to title 35
   var gs = 0;
   final n = tags.length;
@@ -103,7 +98,6 @@ SeoQuick seoLocalScores({required String title, required String desc, required L
   } else if (shared == 1) {
     gs += 20;
   }
-
   ts = ts.clamp(0, 100);
   ds = ds.clamp(0, 100);
   gs = gs.clamp(0, 100);
@@ -117,7 +111,6 @@ class SeoScoreRing extends StatelessWidget {
   final double stroke;
   final bool showMax;
   const SeoScoreRing({super.key, required this.score, this.size = 56, this.stroke = 5, this.showMax = false});
-
   @override
   Widget build(BuildContext context) {
     final c = seoBandColor(score);
@@ -142,7 +135,6 @@ class SeoScoreRing extends StatelessWidget {
 class SeoBandChip extends StatelessWidget {
   final int? score;
   const SeoBandChip({super.key, required this.score});
-
   @override
   Widget build(BuildContext context) {
     final c = seoBandColor(score);
@@ -164,7 +156,6 @@ class SeoLocked extends StatelessWidget {
   final VoidCallback? onTap;
   final double radius;
   const SeoLocked({super.key, required this.child, this.label = '', this.onTap, this.radius = 16});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -223,10 +214,8 @@ class SeoAnalysisScreen extends StatefulWidget {
   final int initialTab;
   final VoidCallback? onApplied;
   const SeoAnalysisScreen({super.key, required this.video, this.result, this.level = 'none', this.thumb, this.initialTab = 0, this.onApplied});
-
   static final Map<String, List<String>> titleCache = {};
   static final Map<String, List<String>> descCache = {};
-
   @override
   State<SeoAnalysisScreen> createState() => _SeoAnalysisScreenState();
 }
@@ -241,18 +230,15 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
   String? _pickedTitle;
   String? _pickedDesc;
   bool _pickedTags = false;
-
   bool get _free => widget.level == 'none';
   bool get _adv => widget.level == 'advance';
   Map<String, dynamic> get _res => widget.result ?? const <String, dynamic>{};
-
   String get _vid => (widget.video['videoId'] ?? '').toString();
   String get _title => (widget.video['title'] ?? '').toString();
   String get _desc => (widget.video['description'] ?? '').toString();
   List<String> get _tags => ((widget.video['tags'] as List?) ?? []).map((e) => e.toString()).toList();
   List<String> get _recTags => ((_res['recommendedTags'] as List?) ?? []).map((e) => e.toString()).toList();
   bool get _hasPick => _pickedTitle != null || _pickedDesc != null || _pickedTags;
-
   late final SeoQuick _q = seoLocalScores(title: _title, desc: _desc, tags: _tags);
 
   @override
@@ -291,8 +277,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     }).where((s) => s.trim().isNotEmpty).toList();
   }
 
+  // ✅ FIXED: `return _goUpgrade();` -> block + plain return (void fn can't return a value)
   Future<void> _generateTitles() async {
-    if (_free) return _goUpgrade();
+    if (_free) {
+      _goUpgrade();
+      return;
+    }
     if (_genTitles) return;
     setState(() => _genTitles = true);
     try {
@@ -313,8 +303,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     }
   }
 
+  // ✅ FIXED
   Future<void> _generateDescs() async {
-    if (_free) return _goUpgrade();
+    if (_free) {
+      _goUpgrade();
+      return;
+    }
     if (_genDescs) return;
     setState(() => _genDescs = true);
     try {
@@ -334,8 +328,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     }
   }
 
+  // ✅ FIXED
   void _improveWithAi() {
-    if (_free) return _goUpgrade();
+    if (_free) {
+      _goUpgrade();
+      return;
+    }
     setState(() => _tab = 1);
     if (_titles.isEmpty) _generateTitles();
   }
@@ -364,14 +362,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
   }
 
   // ───────────── placeholders (sample content only - never real paid data) ─────────────
-
   static const _phTitle = 'Top 10 Best Hidden Gems You Must Know in 2026 | Complete Guide';
   static const _phDesc =
       'In this video we cover everything you need to know, step by step. Watch till the end for the best tip.\n\n🔔 Subscribe for more\n#viral #trending #shorts';
   static const _phTags = ['trending video', 'best tips 2026', 'how to guide', 'must watch', 'viral shorts', 'explained'];
 
   // ───────────── UI pieces ─────────────
-
   Widget _card({required Widget child, EdgeInsets? margin}) => Container(
         margin: margin ?? const EdgeInsets.only(top: 14),
         padding: const EdgeInsets.all(14),
@@ -603,20 +599,17 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
   }
 
   // ───────────── tabs ─────────────
-
   Widget _overviewTab() {
     final bd = _res['breakdown'] as Map?;
     int? sc(String k) {
       if (_free) return k == 'titleScore' ? _q.title : (k == 'descScore' ? _q.desc : _q.tags);
       return (bd?[k] as num?)?.toInt();
     }
-
     final issues = ((_res['issues'] as List?) ?? []).map((e) => e.toString()).toList();
     final notes = (_res['notes'] ?? '').toString();
     final gap = (_res['competitorGapNotes'] ?? '').toString();
     final sugKeys = widget.thumb?.suggestionKeys() ?? [];
     final thumbUrl = (widget.video['thumbnailHigh'] ?? widget.video['thumbnail'] ?? '').toString();
-
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Thumbnail: score + suggestions measured on the phone. Free users see the first 2 suggestions.
       _analysisCard(heading: context.tr('so_thumb_title'), score: widget.thumb?.overall, imageUrl: thumbUrl),
@@ -701,7 +694,6 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     final hasKw = words.any(lower.contains);
     final others = _titles.length > 1 ? _titles.skip(1).toList() : <String>[];
     final visible = _showAllTitles ? others : others.take(2).toList();
-
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _card(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -925,19 +917,22 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
       default:
         body = _overviewTab();
     }
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('video_seo_optimizer_title'))),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          child: SizedBox(height: 54, width: double.infinity, child: _bottomButton()),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('video_seo_optimizer_title'))),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+            child: SizedBox(height: 54, width: double.infinity, child: _bottomButton()),
+          ),
         ),
+        body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
+          _pills(),
+          _miniHeader(overall),
+          body,
+        ]),
       ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
-        _pills(),
-        _miniHeader(overall),
-        body,
-      ]),
     );
   }
 }

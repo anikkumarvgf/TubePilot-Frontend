@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// becomes selectable through [ThemeProvider.setActiveFestival].
 enum FestivalTheme {
   none(null),
-  diwali('assets/images/diwali_bg.png');
+  diwali('assets/diwali_bg.png');
 
   const FestivalTheme(this.backgroundAsset);
 

@@ -431,14 +431,10 @@ class ApiService {
         if (postSalt != null) 'postSalt': postSalt,
       });
 
-  // Old names kept so cashfree_checkout.dart / Live Plans (still on Cashfree) keep compiling.
-  Future<Map<String, dynamic>> createCashfreeOrder(int diamondPackage) => createPayuOrder(diamondPackage);
-  Future<Map<String, dynamic>> verifyCashfreePayment(String orderId) => verifyPayuPayment(orderId);
-
   // ------ GET /api/diamonds/my-requests ------ //
   Future<Map<String, dynamic>> myPurchaseRequests() => _request('/diamonds/my-requests');
 
-  // ---------------- Live Streaming Plans (Day Pass / Month Pass) ----------------
+  // ---------------- Live Streaming Plans (Day Pass / Month Pass) - paid via PayU ----------------
   // ------ GET /api/live-plans ------ //
   Future<Map<String, dynamic>> getLivePlans() => _request('/live-plans');
 

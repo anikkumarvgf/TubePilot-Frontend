@@ -1,3 +1,4 @@
+import 'dart:math' show max;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,22 +10,34 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
-// ⚠️ NEW: Milestone achievement popup (subscribers / views card)
+// Festival background + clean white cards (shared decor)
+import '../widgets/diwali_decor.dart';
+// Diwali welcome popup + shared popup shell
+import '../widgets/diwali_popups.dart';
+// Milestone achievement popup (subscribers / views card)
 import '../widgets/milestone_popup.dart';
 import 'upload_screen.dart';
 import 'upcoming_screen.dart';
 import 'analytics_screen.dart';
 import 'profile_screen.dart';
 import 'wallet_screen.dart';
+// Premium tile opens the Buy Diamonds screen
+import 'diamond_store_screen.dart';
 import 'notifications_screen.dart';
 import 'rate_us_screen.dart';
 import 'ai_ideas_screen.dart';
 import 'ai_title_description_screen.dart';
 import 'channel_audit_screen.dart';
-// ⚠️ NEW: Quick Actions mein "Video Analytics" ki jagah "Live Stream" button.
+// Quick Actions has a "Live Stream" button.
 import 'live_stream_screen.dart';
 
 const String kIdeasPopupLastShownKey = 'ideas_popup_last_shown_ms';
+
+/// Horizontal padding for the whole screen.
+const double _kScreenPadding = 16;
+
+/// Gap between card rows.
+const double _kRowGap = 14;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -45,10 +58,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const ProfileScreen(embedded: true),
     ];
 
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(index: _tabIndex, children: screens),
-      bottomNavigationBar: AppBottomNav(currentIndex: _tabIndex, onTap: (i) => setState(() => _tabIndex = i)),
+    // ⚠️ FIX (bottom overlap): the background now lives here, behind the
+    // Scaffold, and extendBody is FALSE. The body therefore ends exactly where
+    // the floating bottom bar begins, so content can never slide underneath it.
+    return DiwaliBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBody: false,
+        body: IndexedStack(index: _tabIndex, children: screens),
+        bottomNavigationBar: AppBottomNav(currentIndex: _tabIndex, onTap: (i) => setState(() => _tabIndex = i)),
+      ),
     );
   }
 }
@@ -59,9 +78,9 @@ class _DashboardHome extends StatefulWidget {
   State<_DashboardHome> createState() => _DashboardHomeState();
 }
 
-// ⚠️ CHANGED: WidgetsBindingObserver added so we notice when the user returns
-// from the YouTube connect screen (browser) and can show the first milestone
-// card / idea popup for the freshly connected channel.
+// WidgetsBindingObserver added so we notice when the user returns from the
+// YouTube connect screen (browser) and can show the first milestone card /
+// idea popup for the freshly connected channel.
 class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObserver {
   Map<String, dynamic>? data;
   List<dynamic> notifications = [];
@@ -83,13 +102,16 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     _load().then((_) async {
       if (!mounted) return;
 
-      // ⚠️ NEW: Milestone popup sabse pehle (priority). Agar milestone card
-      // dikha, to is baar Rate Us aur AI Idea popup skip — ek ke upar ek
-      // dialog na khule.
+      // Diwali welcome popup — only the first time. If shown, skip the rest this time.
+      final shownWelcome = await maybeShowDiwaliWelcome(context);
+      if (!mounted || shownWelcome) return;
+
+      // Milestone popup has priority. If a milestone card was shown, skip
+      // Rate Us and the AI Idea popup this time — no dialog on top of another.
       final shownMilestone = await MilestonePopup.checkAndShow(context);
       if (!mounted || shownMilestone) return;
 
-      // ⚠️ FIX: wait for Rate Us to close first, so the Idea popup never opens on top of it.
+      // Wait for Rate Us to close first, so the Idea popup never opens on top of it.
       await maybeShowRateUsPopup(context);
       if (!mounted) return;
       await Future.delayed(const Duration(milliseconds: 500));
@@ -134,7 +156,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 
   Future<void> _maybeShowIdeaPopup() async {
-    // ⚠️ FIX: no channel connected -> no ideas. (Also do NOT start the 24h timer.)
+    // No channel connected -> no ideas. (Also do NOT start the 24h timer.)
     if (youtubeChannel == null) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -145,7 +167,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     }
     if (!mounted) return;
 
-    // ⚠️ FIX: niche comes from the connected channel (its category, else its name).
+    // Niche comes from the connected channel (its category, else its name).
     final category = (youtubeChannel?['category'] ?? '').toString().trim();
     final title = (youtubeChannel?['channelTitle'] ?? '').toString().trim();
     final niche = category.isNotEmpty ? category : title;
@@ -267,6 +289,17 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     return 10;
   }
 
+  // "remaining / total" card. Remaining comes from the backend. Total: backend
+  // total key, else remaining+used, else 20 (default free uploads).
+  ({int remaining, int total}) _freeUploads() {
+    int? n(dynamic v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}');
+    final remaining = n(data?['remainingFreeUploads']) ?? 0;
+    final explicit = n(data?['totalFreeUploads'] ?? data?['freeUploadsLimit'] ?? data?['monthlyFreeUploads']);
+    final used = n(data?['usedFreeUploads'] ?? data?['freeUploadsUsed']);
+    final total = (explicit != null && explicit > 0) ? explicit : (used != null ? remaining + used : 20);
+    return (remaining: remaining, total: max(total, remaining));
+  }
+
   ({String label, Color color}) _platformMeta(BuildContext context, String? platform) {
     switch (platform) {
       case 'youtube':
@@ -282,21 +315,46 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   Widget build(BuildContext context) {
     final diamondBalance = (data?['diamondBalance'] ?? 0) as num;
     final worthUploads = diamondBalance ~/ _diamondCostPerUpload;
+    final free = _freeUploads();
 
+    // The festival background is provided by DashboardScreen, so this
+    // Scaffold is simply transparent.
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        titleSpacing: 20,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        toolbarHeight: 66,
+        // Side spacing keeps title / buttons clear of the hanging diyas in the artwork.
+        titleSpacing: 36,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset('assets/splash.png', width: 36, height: 36),
+            Image.asset('assets/splash.png', width: 40, height: 40),
             const SizedBox(width: 8),
-            RichText(
-              text: const TextSpan(
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, fontFamily: 'inherit'),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextSpan(text: 'Tube', style: TextStyle(color: Colors.black)),
-                  TextSpan(text: 'Pilot', style: TextStyle(color: AppColors.purple)),
+                  RichText(
+                    text: const TextSpan(
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 23, height: 1.05, letterSpacing: -0.5),
+                      children: [
+                        TextSpan(text: 'Tube', style: TextStyle(color: DiwaliColors.purpleDark)),
+                        TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    'Your YouTube Growth Partner',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 10, fontWeight: FontWeight.w500),
+                  ),
                 ],
               ),
             ),
@@ -307,31 +365,35 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined),
+                icon: const Icon(Icons.notifications_none_rounded, color: DiwaliColors.purpleDark, size: 26),
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())).then((_) => _load(showLoader: false)),
               ),
               if (unreadCount > 0)
-                Positioned(right: 10, top: 10, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle))),
+                Positioned(right: 10, top: 10, child: Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle))),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 14, left: 2),
+            padding: const EdgeInsets.only(right: 38, left: 2),
             child: Tooltip(
               message: context.tr('profile_tooltip'),
               child: GestureDetector(
                 onTap: _goToProfile,
                 child: Container(
-                  width: 34,
-                  height: 34,
+                  width: 38,
+                  height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    gradient: AppColors.gradient,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [DiwaliColors.purple, DiwaliColors.purpleDark],
+                    ),
                     shape: BoxShape.circle,
-                    border: Border.all(color: Theme.of(context).colorScheme.surface, width: 1.5),
+                    border: Border.all(color: DiwaliColors.goldLight, width: 1.5),
                   ),
                   child: Text(
                     _userInitial(context),
-                    style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -344,180 +406,435 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
           : RefreshIndicator(
               onRefresh: () => _load(showLoader: false),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+                // Bottom padding is small now: the body already ends above the
+                // floating nav bar (extendBody: false), so nothing is hidden.
+                padding: const EdgeInsets.fromLTRB(_kScreenPadding, 8, _kScreenPadding, 24),
                 children: [
-                  RichText(
-                    text: TextSpan(
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.black),
-                      children: [
-                        TextSpan(text: '${context.tr('hello_greeting')} '),
-                        TextSpan(text: '${_userFirstName(context)}! 👋', style: const TextStyle(color: AppColors.purple)),
-                      ],
+                  // ---- Greeting (large + bold) and subtext (small + grey) ----
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${context.tr('hello_greeting')} ${_userFirstName(context)}! 👋',
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: DiwaliColors.purpleDark,
+                        letterSpacing: -0.4,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(context.tr('welcome_back_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-                  const SizedBox(height: 12),
-
-                  GridView.count(
-                    // ⚠️ FIX: padding null hone par Flutter GridView mein MediaQuery ka bottom padding
-                    // (floating bottom bar ki jagah) apne aap jod deta hai — isi se cards aur Quick Actions
-                    // ke beech badi khali jagah banti thi. Zero karne se wo jagah band ho jati hai.
-                    padding: EdgeInsets.zero,
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.3,
-                    children: [
-                      _MetricCard(
-                        icon: Icons.cloud_upload_rounded,
-                        label: context.tr('stat_free_uploads_left'),
-                        value: '${data?['remainingFreeUploads'] ?? 0}',
-                        subtitle: context.tr('resets_30_days'),
-                      ),
-                      _MetricCard(
-                        icon: Icons.diamond_rounded,
-                        label: context.tr('stat_diamond_balance'),
-                        value: '$diamondBalance',
-                        subtitle: worthUploads > 0 ? context.tr('diamonds_worth_uploads').replaceAll('%d', '$worthUploads') : null,
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen())).then((_) => _load(showLoader: false)),
-                      ),
-                      _MetricCard(
-                        icon: Icons.play_circle_fill_rounded,
-                        label: context.tr('stat_videos_published'),
-                        value: '${data?['totalUploadedVideos'] ?? 0}',
-                        subtitle: context.tr('total_videos'),
-                      ),
-                      _MetricCard(
-                        icon: Icons.event_available_rounded,
-                        label: context.tr('scheduled_videos'),
-                        value: '${upcomingEvents.length}',
-                        subtitle: context.tr('this_month'),
-                      ),
-                    ],
+                  Text(
+                    context.tr('welcome_back_subtitle'),
+                    style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13.5, height: 1.25),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
 
-                  Text(context.tr('quick_actions'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _quickAction(
-                        icon: Icons.cloud_upload_rounded,
-                        label: context.tr('qa_upload_video'),
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
-                      ),
-                      // ⚠️ CHANGED: yahan pehle "Video Analytics" tha. Ab "Live Stream".
-                      // (Analytics ab bottom bar ke Analytics tab se khulta hai.)
-                      // Label key: 'qa_live_stream' (live_strings_to_add.txt wale block mein).
-                      _quickAction(
-                        icon: Icons.podcasts_rounded,
-                        label: context.tr('qa_live_stream'),
-                        onTap: () => Navigator.of(context)
-                            .push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))
-                            .then((_) => _load(showLoader: false)),
-                      ),
-                      _quickAction(
-                        icon: Icons.auto_awesome_rounded,
-                        label: context.tr('qa_ai_ideas'),
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
-                      ),
-                      _quickAction(
-                        icon: Icons.notes_rounded,
-                        label: context.tr('qa_description_ideas'),
-                        onTap: () => Navigator.of(context)
-                            .push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen(startInDescriptionMode: true))),
-                      ),
-                      _quickAction(
-                        icon: Icons.fact_check_rounded,
-                        label: context.tr('qa_channel_audit'),
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen())),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
+                  // ---- Stat cards (2 x 2). Rows size themselves to their content,
+                  // so there is no fixed aspect ratio that can overflow. ----
+                  _cardRow([
+                    _MetricCard(
+                      icon: Icons.cloud_upload_rounded,
+                      label: context.tr('stat_free_uploads_left'),
+                      value: '${data?['remainingFreeUploads'] ?? 0}',
+                      subtitle: context.tr('resets_30_days'),
+                    ),
+                    _MetricCard(
+                      icon: Icons.diamond_outlined,
+                      label: context.tr('stat_diamond_balance'),
+                      value: '$diamondBalance',
+                      subtitle: worthUploads > 0 ? context.tr('diamonds_worth_uploads').replaceAll('%d', '$worthUploads') : null,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen())).then((_) => _load(showLoader: false)),
+                    ),
+                  ]),
+                  const SizedBox(height: _kRowGap),
+                  _cardRow([
+                    _MetricCard(
+                      icon: Icons.play_circle_fill_rounded,
+                      label: context.tr('stat_videos_published'),
+                      value: '${data?['totalUploadedVideos'] ?? 0}',
+                      subtitle: context.tr('total_videos'),
+                    ),
+                    _MetricCard(
+                      icon: Icons.event_available_rounded,
+                      label: context.tr('scheduled_videos'),
+                      value: '${upcomingEvents.length}',
+                      subtitle: context.tr('this_month'),
+                    ),
+                  ]),
+                  const SizedBox(height: _kRowGap),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          context.tr('upcoming_schedule'),
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  // ---- AI Ideas + Free uploads strip ----
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          flex: 11,
+                          child: DiwaliCard(
+                            padding: const EdgeInsets.all(12),
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
+                            child: Row(
+                              children: [
+                                const _IconCircle(icon: Icons.bolt_rounded, size: 42, iconSize: 24),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        context.tr('qa_ai_ideas'),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 16, fontWeight: FontWeight.w800),
+                                      ),
+                                      const Text(
+                                        'Get video ideas tailored to your niche',
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(color: DiwaliColors.textDim, fontSize: 10.5, height: 1.2),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.purpleDeep),
+                                  child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 18),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UpcomingScreen())),
-                        child: Text(context.tr('see_all'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 8,
+                          child: DiwaliCard(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
+                            child: Row(
+                              children: [
+                                const _IconCircle(icon: Icons.diamond_rounded, size: 34, iconSize: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        context.tr('stat_free_uploads_left'),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 10.5, height: 1.15, fontWeight: FontWeight.w500),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          '${free.remaining} / ${free.total}',
+                                          style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 18, fontWeight: FontWeight.w800),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: free.total > 0 ? (free.remaining / free.total).clamp(0.0, 1.0) : 0,
+                                          minHeight: 4,
+                                          backgroundColor: DiwaliColors.iconCircle,
+                                          valueColor: const AlwaysStoppedAnimation(DiwaliColors.gold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(Icons.chevron_right_rounded, color: DiwaliColors.purpleDark, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  if (upcomingEvents.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-                      child: Text(context.tr('no_upcoming_publishes'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-                    )
-                  else
-                    ...upcomingEvents.map((e) => _mediaRow(
-                          context,
-                          thumbnailUrl: e['thumbnailUrl'],
-                          title: e['title'] ?? '',
-                          platform: e['platform'],
-                          badgeLabel: e['status'] == 'pending' ? context.tr('status_scheduled') : context.tr('status_queued'),
-                          dateLabel: e['scheduledAt'] != null ? formatDateTime(e['scheduledAt']) : context.tr('publishing_now'),
-                          onTap: () => _openPreview(e),
-                        )),
-                  const SizedBox(height: 14),
-
-                  Text(context.tr('recent_activity_home'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  if (recentVideos.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-                      child: Text(context.tr('no_recent_activity'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-                    )
-                  else
-                    ...recentVideos.map((e) => _mediaRow(
-                          context,
-                          thumbnailUrl: e['thumbnailUrl'],
-                          title: e['title'] ?? '',
-                          platform: e['platform'],
-                          badgeLabel: context.tr('status_published'),
-                          dateLabel: formatDate(e['publishedAt'] ?? e['scheduledAt']),
-                        )),
                   const SizedBox(height: 20),
+
+                  // ---- Quick Actions ----
+                  Text(
+                    context.tr('quick_actions'),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, letterSpacing: -0.3),
+                  ),
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _quickAction(
+                            icon: Icons.cloud_upload_outlined,
+                            label: context.tr('qa_upload_video'),
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // "Live Stream" (Analytics opens from the bottom bar tab).
+                        Expanded(
+                          child: _quickAction(
+                            icon: Icons.podcasts_rounded,
+                            label: context.tr('qa_live_stream'),
+                            onTap: () => Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))
+                                .then((_) => _load(showLoader: false)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _quickAction(
+                            icon: Icons.auto_awesome_rounded,
+                            label: context.tr('qa_ai_ideas'),
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _quickAction(
+                            icon: Icons.edit_note_rounded,
+                            label: context.tr('qa_description_ideas'),
+                            onTap: () => Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen(startInDescriptionMode: true))),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Premium tile -> Buy Diamonds screen.
+                        Expanded(
+                          child: _quickAction(
+                            icon: Icons.workspace_premium_rounded,
+                            label: 'Premium',
+                            onTap: () => Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))
+                                .then((_) => _load(showLoader: false)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: _kRowGap),
+
+                  // ---- Channel Audit + Competitor Radar ----
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _featureCard(
+                            icon: Icons.workspace_premium_rounded,
+                            title: context.tr('qa_channel_audit'),
+                            subtitle: 'Get detailed insights & improve your channel',
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen())),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Competitor Radar — route not known yet, so "coming soon" toast.
+                        // Put your screen's route here when it exists.
+                        Expanded(
+                          child: _featureCard(
+                            icon: Icons.emoji_events_rounded,
+                            title: 'Competitor Radar',
+                            subtitle: 'See what your competitors do',
+                            onTap: () => showToast(context, 'Competitor Radar coming soon', isSuccess: true),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: _kRowGap),
+
+                  // ---- Upcoming Schedule ----
+                  DiwaliCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const _IconCircle(icon: Icons.calendar_month_rounded, size: 34, iconSize: 19),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                context.tr('upcoming_schedule'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UpcomingScreen())),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(context.tr('see_all'), style: const TextStyle(color: DiwaliColors.purple, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 3),
+                                  const Icon(Icons.arrow_forward_rounded, color: DiwaliColors.purple, size: 15),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (upcomingEvents.isEmpty)
+                          _emptyStrip(
+                            icon: Icons.event_note_rounded,
+                            text: context.tr('no_upcoming_publishes'),
+                          )
+                        else
+                          ...upcomingEvents.map((e) => _mediaRow(
+                                context,
+                                thumbnailUrl: e['thumbnailUrl'],
+                                title: e['title'] ?? '',
+                                platform: e['platform'],
+                                badgeLabel: e['status'] == 'pending' ? context.tr('status_scheduled') : context.tr('status_queued'),
+                                dateLabel: e['scheduledAt'] != null ? formatDateTime(e['scheduledAt']) : context.tr('publishing_now'),
+                                onTap: () => _openPreview(e),
+                              )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: _kRowGap),
+
+                  // ---- Recent Activity ----
+                  DiwaliCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const _IconCircle(icon: Icons.bolt_rounded, size: 34, iconSize: 19),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                context.tr('recent_activity_home'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        if (recentVideos.isEmpty)
+                          _emptyStrip(
+                            icon: Icons.history_rounded,
+                            text: context.tr('no_recent_activity'),
+                          )
+                        else
+                          ...recentVideos.map((e) => _mediaRow(
+                                context,
+                                thumbnailUrl: e['thumbnailUrl'],
+                                title: e['title'] ?? '',
+                                platform: e['platform'],
+                                badgeLabel: context.tr('status_published'),
+                                dateLabel: formatDate(e['publishedAt'] ?? e['scheduledAt']),
+                              )),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
     );
   }
 
+  /// Two equal-width cards in a row, both as tall as the taller one.
+  Widget _cardRow(List<Widget> children) {
+    final items = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) items.add(const SizedBox(width: 12));
+      items.add(Expanded(child: children[i]));
+    }
+    return IntrinsicHeight(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: items),
+    );
+  }
+
   Widget _quickAction({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(16)),
-              child: Icon(icon, color: Colors.white, size: 22),
+    return DiwaliCard(
+      // Five tiles share one row, so side padding is kept small here.
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _IconCircle(icon: icon, size: 42, iconSize: 23),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: DiwaliColors.purpleDark, height: 1.15),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _featureCard({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
+    return DiwaliCard(
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          _IconCircle(icon: icon, size: 40, iconSize: 22),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: DiwaliColors.textDim, fontSize: 10, height: 1.2),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(label, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600)),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyStrip({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: DiwaliColors.creamTop,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          _IconCircle(icon: icon, size: 36, iconSize: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, height: 1.3),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -535,9 +852,13 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(
+          color: DiwaliColors.creamTop,
+          border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.5)),
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Row(
           children: [
             ClipRRect(
@@ -555,17 +876,17 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: DiwaliColors.purpleDark)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       _platformBadgeIcon(platform),
                       const SizedBox(width: 5),
-                      Text(meta.label, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      Text(meta.label, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5, fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(dateLabel, style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
+                  Text(dateLabel, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11)),
                 ],
               ),
             ),
@@ -598,6 +919,25 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 }
 
+// Every icon in the dashboard: rounded icon inside a light beige circle.
+class _IconCircle extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final double iconSize;
+  const _IconCircle({required this.icon, required this.size, required this.iconSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.iconCircle),
+      child: Icon(icon, color: DiwaliColors.purpleDeep, size: iconSize),
+    );
+  }
+}
+
 class _MetricCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -608,36 +948,25 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return DiwaliCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: context.surfaces.card2,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: AppColors.purple.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(9)),
-              child: Icon(icon, color: AppColors.purple, size: 14),
-            ),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 1),
-            Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-            if (subtitle != null) ...[
-              Text(subtitle!, style: TextStyle(color: context.surfaces.textDim, fontSize: 9.5), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ],
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _IconCircle(icon: icon, size: 36, iconSize: 19),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, height: 1.2)),
+          if (subtitle != null)
+            Text(subtitle!, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
       ),
     );
   }
@@ -648,7 +977,7 @@ class _MetricCard extends StatelessWidget {
 // =============================================================================
 
 Future<void> showIdeaPopup(BuildContext context, {String? channelNiche}) async {
-  // ⚠️ FIX: no niche = no connected channel -> never show generic 'Tech' ideas,
+  // No niche = no connected channel -> never show generic 'Tech' ideas,
   // no matter which screen calls this.
   if (channelNiche == null || channelNiche.trim().isEmpty) return;
 
@@ -749,12 +1078,12 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
             scale: scale,
             child: Container(
               width: 190,
-              height: 330,
+              height: 300,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: DiwaliColors.cardTop,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.purple.withValues(alpha: 0.18)),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 3))],
+                border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.8)),
+                boxShadow: [BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 3))],
               ),
             ),
           ),
@@ -766,13 +1095,17 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
   Widget _ideaCard(Map<String, dynamic> idea, int idx) {
     return Container(
       width: 200,
-      height: 330,
-      padding: const EdgeInsets.all(18),
+      height: 300,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [DiwaliColors.cardTop, DiwaliColors.cardBottom],
+        ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.surfaces.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6))],
+        border: Border.all(color: DiwaliColors.cardBorder),
+        boxShadow: [BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 6))],
       ),
       child: SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(),
@@ -786,22 +1119,22 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                   width: 28,
                   height: 28,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.lightbulb_rounded, color: AppColors.purple, size: 15),
+                  decoration: BoxDecoration(color: DiwaliColors.gold.withValues(alpha: 0.22), shape: BoxShape.circle),
+                  child: const Icon(Icons.lightbulb_rounded, color: DiwaliColors.purpleDeep, size: 15),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     context.tr('idea_popup_card_label').replaceAll('%d', '${idx + 1}'),
-                    style: TextStyle(color: context.surfaces.textDim, fontSize: 11, fontWeight: FontWeight.w700),
+                    style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            Text(idea['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            Text(idea['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark)),
             const SizedBox(height: 10),
-            Text(idea['description'] ?? idea['hook'] ?? '', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4)),
+            Text(idea['description'] ?? idea['hook'] ?? '', style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, height: 1.4)),
           ],
         ),
       ),
@@ -839,107 +1172,98 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
   @override
   Widget build(BuildContext context) {
     return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-      child: Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: DiwaliPopupShell(
+        onClose: () => Navigator.of(context).pop(),
+        padding: const EdgeInsets.fromLTRB(20, 26, 20, 14),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ⚠️ FIX (Boss request — dark backdrop banne se in
-                  // headers/labels ka contrast bhi kam tha): title row and
-                  // page counter, which sit directly over the blurred dark
-                  // background, are now white/near-white so they stay
-                  // readable regardless of what's behind the dialog.
-                  Row(children: [
-                    const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(context.tr('idea_popup_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.white))),
-                    Text('${_index + 1}/${widget.ideas.length}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  ]),
-                  const SizedBox(height: 18),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title (centered so it clears the hanging diyas and the close button)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 34),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, color: DiwaliColors.purpleDeep, size: 18),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          context.tr('idea_popup_title'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text('${_index + 1}/${widget.ideas.length}', style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5)),
+                const SizedBox(height: 10),
 
-                  SizedBox(
-                    height: 350,
-                    child: Stack(
-                      alignment: Alignment.topCenter,
-                      clipBehavior: Clip.none,
-                      children: [
-                        if (_index < widget.ideas.length - 2)
-                          _peekCard(angle: -0.15, top: 12, opacity: 0.45, scale: 0.92),
-                        if (_index < widget.ideas.length - 1)
-                          _peekCard(angle: 0.11, top: 6, opacity: 0.7, scale: 0.96),
-                        AnimatedOpacity(
-                          opacity: _dismissing ? 0 : 1,
+                SizedBox(
+                  height: 320,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (_index < widget.ideas.length - 2)
+                        _peekCard(angle: -0.15, top: 12, opacity: 0.45, scale: 0.92),
+                      if (_index < widget.ideas.length - 1)
+                        _peekCard(angle: 0.11, top: 6, opacity: 0.7, scale: 0.96),
+                      AnimatedOpacity(
+                        opacity: _dismissing ? 0 : 1,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                        child: AnimatedScale(
+                          scale: _dismissing ? 0.88 : 1,
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeOut,
-                          child: AnimatedScale(
-                            scale: _dismissing ? 0.88 : 1,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                            child: PageView.builder(
-                              controller: _pageController,
-                              itemCount: widget.ideas.length,
-                              onPageChanged: (i) => setState(() => _index = i),
-                              itemBuilder: (_, i) => Center(child: _ideaCard(widget.ideas[i], i)),
-                            ),
+                          child: PageView.builder(
+                            controller: _pageController,
+                            itemCount: widget.ideas.length,
+                            onPageChanged: (i) => setState(() => _index = i),
+                            itemBuilder: (_, i) => Center(child: _ideaCard(widget.ideas[i], i)),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  // ⚠️ FIX: swipe hint also sits on the dark backdrop —
-                  // white70 instead of the theme's dim-text color.
-                  Text(
-                    context.tr('idea_popup_swipe_hint'),
-                    style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontStyle: FontStyle.italic),
-                  ),
-                  const SizedBox(height: 14),
-
-                  Container(
-                    color: Colors.transparent,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: _reactions.map((e) => GestureDetector(
-                        onTap: () => _onReactionTap(e),
-                        child: Text(e, style: const TextStyle(fontSize: 26)),
-                      )).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // ⚠️ FIX (Boss request — "Copy Idea aur Skip purple hai,
-                  // dark background pe dikhta nahi, white karo"): both
-                  // buttons sit directly on the blurred dark backdrop, not
-                  // on a white card — AppColors.purple text there had poor
-                  // contrast. Both now render in solid white.
-                  Center(
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                       ),
-                      onPressed: () => _copyIdea(widget.ideas[_index]),
-                      icon: const Icon(Icons.copy_rounded, size: 16, color: Colors.white),
-                      label: Text(context.tr('idea_popup_copy_btn'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  TextButton(
-                    style: TextButton.styleFrom(foregroundColor: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(context.tr('skip'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  context.tr('idea_popup_swipe_hint'),
+                  style: const TextStyle(color: DiwaliColors.textDim, fontSize: 10.5, fontStyle: FontStyle.italic),
+                ),
+                const SizedBox(height: 10),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: _reactions
+                      .map((e) => GestureDetector(
+                            onTap: () => _onReactionTap(e),
+                            child: Text(e, style: const TextStyle(fontSize: 26)),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+
+                DiwaliButton(
+                  label: context.tr('idea_popup_copy_btn'),
+                  leading: const Icon(Icons.copy_rounded, size: 16, color: Colors.white),
+                  onTap: () => _copyIdea(widget.ideas[_index]),
+                ),
+                const SizedBox(height: 2),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: DiwaliColors.purpleDark),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(context.tr('skip'), style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w600)),
+                ),
+              ],
             ),
             ..._flyingEmojis.map(_buildFlyingEmoji),
           ],

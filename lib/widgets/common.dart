@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../providers/language_provider.dart';
+import 'diwali_decor.dart';
 
 // ---------------- Toast ----------------
 // ⚠️ FIX (Boss request — "notification niche se green background me aata
@@ -355,10 +356,9 @@ class StatCard extends StatelessWidget {
   }
 }
 
-// ---------------- Bottom Nav (floating pill, icon-only) ----------------
-// Same 5 tabs, same tap behavior as before. Text labels removed per request —
-// only icons are shown now, with a Tooltip carrying the label for accessibility
-// (long-press / screen readers still get the name, sighted users just see icons).
+// ---------------- Bottom Nav (Diwali cream floating pill) ----------------
+// Same 5 tabs, same tap behavior. Cream pill + gold border; selected tab gets a
+// soft plum tint with plum icon + label, others show a dim icon with its label.
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
@@ -374,24 +374,23 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: Container(
-          height: 62,
+          height: 66,
           padding: const EdgeInsets.symmetric(horizontal: 6),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(31),
-            border: Border.all(color: context.surfaces.border),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [DiwaliColors.cardTop, DiwaliColors.cardBottom],
+            ),
+            borderRadius: BorderRadius.circular(33),
+            border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.9), width: 1),
             boxShadow: [
-              BoxShadow(
-                color: isDark ? Colors.black.withValues(alpha: 0.6) : AppColors.purple.withValues(alpha: 0.14),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
-              ),
+              BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
             ],
           ),
           child: Row(
@@ -399,25 +398,40 @@ class AppBottomNav extends StatelessWidget {
               final item = _items[i];
               final selected = i == currentIndex;
               return Expanded(
-                child: Tooltip(
-                  message: item.label,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onTap(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOut,
-                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: selected ? AppColors.purple.withValues(alpha: isDark ? 0.25 : 0.12) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        selected ? item.filled : item.outline,
-                        color: selected ? AppColors.purple : context.surfaces.textDim,
-                        size: 23,
-                      ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onTap(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: selected ? DiwaliColors.purple.withValues(alpha: 0.10) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          selected ? item.filled : item.outline,
+                          color: selected ? DiwaliColors.purpleDark : DiwaliColors.mauve,
+                          size: 23,
+                        ),
+                        const SizedBox(height: 2),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                              color: selected ? DiwaliColors.purpleDark : DiwaliColors.purpleDeep.withValues(alpha: 0.75),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

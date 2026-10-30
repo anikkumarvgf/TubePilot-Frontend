@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/apply_to_video_sheet.dart';
+import '../widgets/app_brand_background.dart';
 
 /// AI Title / Description / Hashtags generator — combined into one screen.
 ///
@@ -25,11 +26,9 @@ class AiTitleDescriptionScreen extends StatefulWidget {
 class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
   final _topicCtrl = TextEditingController();
   bool _loading = false;
-
   late bool _wantTitle = !widget.startInDescriptionMode;
   late bool _wantDescription = true;
   bool _wantHashtags = false;
-
   List<String> _titleOptions = [];
   List<String> _descriptionOptions = [];
   List<String> _hashtags = [];
@@ -54,25 +53,21 @@ class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
       showToast(context, context.tr('atd_select_at_least_one_error'), isError: true);
       return;
     }
-
     setState(() {
       _loading = true;
       _selectedTitleIndex = null;
       _selectedDescIndex = null;
     });
-
     try {
       final futures = <Future>[];
       if (_wantTitle) futures.add(ApiService.instance.aiTitleOptions(topic));
       if (_wantDescription) futures.add(ApiService.instance.aiDescriptionOptions(topic));
       if (_wantHashtags) futures.add(ApiService.instance.aiHashtags(topic, 'youtube'));
-
       final results = await Future.wait(futures);
       int i = 0;
       List<String> titles = [];
       List<String> descriptions = [];
       List<String> hashtags = [];
-
       if (_wantTitle) {
         titles = ((results[i]['titles'] as List?) ?? []).cast<String>();
         i++;
@@ -85,13 +80,11 @@ class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
         hashtags = ((results[i]['hashtags'] as List?) ?? []).cast<String>();
         i++;
       }
-
       setState(() {
         _titleOptions = _wantTitle ? titles : [];
         _descriptionOptions = _wantDescription ? descriptions : [];
         _hashtags = _wantHashtags ? hashtags : [];
       });
-
       final gotNothing = (!_wantTitle || _titleOptions.isEmpty) &&
           (!_wantDescription || _descriptionOptions.isEmpty) &&
           (!_wantHashtags || _hashtags.isEmpty);
@@ -190,91 +183,88 @@ class _AiTitleDescriptionScreenState extends State<AiTitleDescriptionScreen> {
   @override
   Widget build(BuildContext context) {
     final hasAnyResults = _titleOptions.isNotEmpty || _descriptionOptions.isNotEmpty || _hashtags.isNotEmpty;
-
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('atd_title'))),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(context.tr('atd_topic_hint_title'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _topicCtrl,
-            decoration: InputDecoration(hintText: context.tr('atd_niche_hint')),
-            onSubmitted: (_) => _generate(),
-          ),
-          const SizedBox(height: 14),
-          Text(context.tr('atd_what_to_generate'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
-            child: Column(
-              children: [
-                _checkboxRow(context.tr('atd_mode_title'), _wantTitle, (v) => setState(() => _wantTitle = v ?? false)),
-                Divider(height: 1, color: context.surfaces.border),
-                _checkboxRow(context.tr('atd_mode_description'), _wantDescription, (v) => setState(() => _wantDescription = v ?? false)),
-                Divider(height: 1, color: context.surfaces.border),
-                _checkboxRow(context.tr('atd_mode_hashtags'), _wantHashtags, (v) => setState(() => _wantHashtags = v ?? false)),
-              ],
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('atd_title'))),
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text(context.tr('atd_topic_hint_title'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _topicCtrl,
+              decoration: InputDecoration(hintText: context.tr('atd_niche_hint')),
+              onSubmitted: (_) => _generate(),
             ),
-          ),
-          const SizedBox(height: 16),
-          GradientButton(
-            label: context.tr('atd_generate_btn'),
-            icon: Icons.auto_awesome_rounded,
-            loading: _loading,
-            onPressed: _generate,
-          ),
-          const SizedBox(height: 24),
-
-          if (!_loading && !hasAnyResults)
-            EmptyView(message: context.tr('atd_empty_generic'), icon: Icons.title_rounded),
-
-          if (_titleOptions.isNotEmpty) ...[
-            Text(context.tr('atd_mode_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-            const SizedBox(height: 8),
-            _optionsList(_titleOptions, _selectedTitleIndex, (i) => setState(() => _selectedTitleIndex = i)),
-            const SizedBox(height: 12),
-          ],
-
-          if (_descriptionOptions.isNotEmpty) ...[
-            Text(context.tr('atd_mode_description'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-            const SizedBox(height: 8),
-            _optionsList(_descriptionOptions, _selectedDescIndex, (i) => setState(() => _selectedDescIndex = i)),
-            const SizedBox(height: 12),
-          ],
-
-          if (_hashtags.isNotEmpty) ...[
-            Row(children: [
-              Text(context.tr('atd_mode_hashtags'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _copyAllHashtags,
-                icon: const Icon(Icons.copy_rounded, size: 15),
-                label: Text(context.tr('seo_copy_all_btn')),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _hashtags.map((h) => Chip(label: Text('#$h'), backgroundColor: AppColors.purple.withValues(alpha: 0.12))).toList(),
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          if (_titleOptions.isNotEmpty || _descriptionOptions.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _applyToVideo,
-                icon: const Icon(Icons.send_rounded, size: 18),
-                label: Text(context.tr('apply_to_video_btn_label')),
+            const SizedBox(height: 14),
+            Text(context.tr('atd_what_to_generate'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(14)),
+              child: Column(
+                children: [
+                  _checkboxRow(context.tr('atd_mode_title'), _wantTitle, (v) => setState(() => _wantTitle = v ?? false)),
+                  Divider(height: 1, color: context.surfaces.border),
+                  _checkboxRow(context.tr('atd_mode_description'), _wantDescription, (v) => setState(() => _wantDescription = v ?? false)),
+                  Divider(height: 1, color: context.surfaces.border),
+                  _checkboxRow(context.tr('atd_mode_hashtags'), _wantHashtags, (v) => setState(() => _wantHashtags = v ?? false)),
+                ],
               ),
             ),
+            const SizedBox(height: 16),
+            GradientButton(
+              label: context.tr('atd_generate_btn'),
+              icon: Icons.auto_awesome_rounded,
+              loading: _loading,
+              onPressed: _generate,
+            ),
+            const SizedBox(height: 24),
+            if (!_loading && !hasAnyResults)
+              EmptyView(message: context.tr('atd_empty_generic'), icon: Icons.title_rounded),
+            if (_titleOptions.isNotEmpty) ...[
+              Text(context.tr('atd_mode_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              const SizedBox(height: 8),
+              _optionsList(_titleOptions, _selectedTitleIndex, (i) => setState(() => _selectedTitleIndex = i)),
+              const SizedBox(height: 12),
+            ],
+            if (_descriptionOptions.isNotEmpty) ...[
+              Text(context.tr('atd_mode_description'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              const SizedBox(height: 8),
+              _optionsList(_descriptionOptions, _selectedDescIndex, (i) => setState(() => _selectedDescIndex = i)),
+              const SizedBox(height: 12),
+            ],
+            if (_hashtags.isNotEmpty) ...[
+              Row(children: [
+                Text(context.tr('atd_mode_hashtags'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _copyAllHashtags,
+                  icon: const Icon(Icons.copy_rounded, size: 15),
+                  label: Text(context.tr('seo_copy_all_btn')),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _hashtags.map((h) => Chip(label: Text('#$h'), backgroundColor: AppColors.purple.withValues(alpha: 0.12))).toList(),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_titleOptions.isNotEmpty || _descriptionOptions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _applyToVideo,
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: Text(context.tr('apply_to_video_btn_label')),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

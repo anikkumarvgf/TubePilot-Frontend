@@ -6,6 +6,7 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/thumb_metrics.dart';
+import '../widgets/app_brand_background.dart';
 import 'thumbnail_upload_screen.dart';
 
 /// Visual Analyzer - step 2. Real on-device measurements of the video's
@@ -23,7 +24,6 @@ class _ThumbnailAnalysisScreenState extends State<ThumbnailAnalysisScreen> {
   ThumbMetrics? _m;
   bool _loading = true;
   bool _failed = false;
-
   static const _en = {
     'tm_sug_contrast': 'Increase contrast: make text and subject stand out from the background (outline, shadow, darker or lighter backdrop).',
     'tm_sug_dark': 'Brighten the image so the subject is clear on a small phone screen.',
@@ -142,82 +142,85 @@ class _ThumbnailAnalysisScreenState extends State<ThumbnailAnalysisScreen> {
   Widget build(BuildContext context) {
     final url = (widget.video['thumbnailHigh'] ?? widget.video['thumbnail'] ?? '').toString();
     final m = _m;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('va_analysis_title'))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: AspectRatio(aspectRatio: 16 / 9, child: url.isNotEmpty ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2)) : Container(color: context.surfaces.card2)),
-        ),
-        const SizedBox(height: 10),
-        Text((widget.video['title'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-        const SizedBox(height: 16),
-        if (_loading)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: LoadingView())
-        else if (_failed || m == null)
-          Text(context.tr('va_measure_failed'), style: TextStyle(color: context.surfaces.textDim))
-        else ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(context.tr('va_overall'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                const Spacer(),
-                Text('${m.overall}/100', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _band(m.overall))),
-              ]),
-              const SizedBox(height: 14),
-              _row('va_visual_appeal', m.appeal),
-              _row('va_readability', m.readability),
-              _row('va_color_balance', m.colorBalance),
-              _row('va_composition', m.composition),
-              Text(context.tr('so_thumb_note'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
-            ]),
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('va_analysis_title'))),
+        body: ListView(padding: const EdgeInsets.all(20), children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(aspectRatio: 16 / 9, child: url.isNotEmpty ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2)) : Container(color: context.surfaces.card2)),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(context.tr('va_suggestions'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-              const SizedBox(height: 10),
-              if (m.suggestionKeys().isEmpty)
-                Text(context.tr('tm_sug_none'), style: const TextStyle(fontSize: 13, height: 1.4))
-              else
-                for (final k in m.suggestionKeys())
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Icon(Icons.lightbulb_outline_rounded, size: 17, color: Color(0xFFF5A623)),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(context.tr(k), style: const TextStyle(fontSize: 13, height: 1.4))),
-                    ]),
-                  ),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.08), border: Border.all(color: AppColors.purple.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(16)),
-            child: Row(children: [
-              const Icon(Icons.data_object_rounded, color: AppColors.purple),
-              const SizedBox(width: 10),
-              Expanded(child: Text(context.tr('va_json_prompt'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
-              OutlinedButton(onPressed: _viewPrompt, child: Text(context.tr('va_view'))),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          GradientButton(label: context.tr('va_open_gpt_btn'), icon: Icons.open_in_new_rounded, onPressed: _openChatGpt),
-          const SizedBox(height: 8),
-          Text(context.tr('va_gpt_hint'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.4)),
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ThumbnailUploadScreen(video: widget.video, currentMetrics: m))),
-            icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-            label: Text(context.tr('va_upload_btn')),
-          ),
-        ],
-      ]),
+          Text((widget.video['title'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: LoadingView())
+          else if (_failed || m == null)
+            Text(context.tr('va_measure_failed'), style: TextStyle(color: context.surfaces.textDim))
+          else ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Text(context.tr('va_overall'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  const Spacer(),
+                  Text('${m.overall}/100', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _band(m.overall))),
+                ]),
+                const SizedBox(height: 14),
+                _row('va_visual_appeal', m.appeal),
+                _row('va_readability', m.readability),
+                _row('va_color_balance', m.colorBalance),
+                _row('va_composition', m.composition),
+                Text(context.tr('so_thumb_note'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(context.tr('va_suggestions'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                const SizedBox(height: 10),
+                if (m.suggestionKeys().isEmpty)
+                  Text(context.tr('tm_sug_none'), style: const TextStyle(fontSize: 13, height: 1.4))
+                else
+                  for (final k in m.suggestionKeys())
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.lightbulb_outline_rounded, size: 17, color: Color(0xFFF5A623)),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(context.tr(k), style: const TextStyle(fontSize: 13, height: 1.4))),
+                      ]),
+                    ),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.08), border: Border.all(color: AppColors.purple.withValues(alpha: 0.3)), borderRadius: BorderRadius.circular(16)),
+              child: Row(children: [
+                const Icon(Icons.data_object_rounded, color: AppColors.purple),
+                const SizedBox(width: 10),
+                Expanded(child: Text(context.tr('va_json_prompt'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                OutlinedButton(onPressed: _viewPrompt, child: Text(context.tr('va_view'))),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            GradientButton(label: context.tr('va_open_gpt_btn'), icon: Icons.open_in_new_rounded, onPressed: _openChatGpt),
+            const SizedBox(height: 8),
+            Text(context.tr('va_gpt_hint'), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5, height: 1.4)),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ThumbnailUploadScreen(video: widget.video, currentMetrics: m))),
+              icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+              label: Text(context.tr('va_upload_btn')),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 }

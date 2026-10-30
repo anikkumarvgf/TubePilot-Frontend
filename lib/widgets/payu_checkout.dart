@@ -16,15 +16,33 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   late final PayUCheckoutProFlutter _pro;
   Completer<PayuResult>? _done;
   String _txnid = '';
+  // UPDATE24: the same checkout now serves Diamonds AND Live Plans - only the
+  // "verify" call and the pending text differ.
+  Future<Map<String, dynamic>> Function(String txnid) _verify = (t) => ApiService.instance.verifyPayuPayment(t);
+  String _pendingMsg = 'Payment is still being confirmed. Diamonds will be added automatically once it succeeds.';
 
   PayuCheckout() {
     _pro = PayUCheckoutProFlutter(this);
   }
 
-  Future<PayuResult> pay(int diamonds) async {
+  /// Diamond Store purchase.
+  Future<PayuResult> pay(int diamonds) {
+    _verify = (t) => ApiService.instance.verifyPayuPayment(t);
+    _pendingMsg = 'Payment is still being confirmed. Diamonds will be added automatically once it succeeds.';
+    return _run(() => ApiService.instance.createPayuOrder(diamonds));
+  }
+
+  /// Live Streaming plan purchase (category: 'day' | 'month').
+  Future<PayuResult> payLivePlan({required String category, required String planName}) {
+    _verify = (t) => ApiService.instance.verifyLivePlanPayment(t);
+    _pendingMsg = 'Payment is still being confirmed. Your live plan will activate automatically once it succeeds.';
+    return _run(() => ApiService.instance.createLivePlanOrder(category: category, planName: planName));
+  }
+
+  Future<PayuResult> _run(Future<Map<String, dynamic>> Function() createOrder) async {
     Map<String, dynamic> p;
     try {
-      final res = await ApiService.instance.createPayuOrder(diamonds);
+      final res = await createOrder();
       p = Map<String, dynamic>.from(res['payu'] as Map);
       _txnid = p['txnid'].toString();
     } catch (e) {
@@ -69,13 +87,13 @@ class PayuCheckout implements PayUCheckoutProProtocol {
     try {
       for (var i = 1; i <= attempts; i++) {
         debugPrint('[PayU] Verifying $txnid attempt $i/$attempts');
-        final res = await ApiService.instance.verifyPayuPayment(txnid);
+        final res = await _verify(txnid);
         final status = (res['status'] ?? '').toString();
         if (status == 'approved') return const PayuResult('approved');
         if (status == 'failed') return PayuResult('failed', sdkMsg ?? 'Payment was not completed.');
         if (i < attempts) await Future.delayed(const Duration(seconds: 3));
       }
-      return const PayuResult('pending', 'Payment is still being confirmed. Diamonds will be added automatically once it succeeds.');
+      return PayuResult('pending', _pendingMsg);
     } catch (e) {
       return PayuResult('error', sdkMsg ?? e.toString());
     }

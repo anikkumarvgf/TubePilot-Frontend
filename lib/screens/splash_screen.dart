@@ -5,13 +5,13 @@ import '../services/storage_service.dart';
 import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
+import '../widgets/app_brand_background.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -19,7 +19,6 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   // Splash visible for 7 seconds
   static const _minSplashDuration = Duration(seconds: 7);
-
   late final AnimationController _logoController; // scale/fade-in for the logo
   late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
@@ -27,12 +26,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-
     _logoController = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
     _logoScale = CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack);
     _logoFade = CurvedAnimation(parent: _logoController, curve: Curves.easeIn);
     _logoController.forward();
-
     // ⚠️ REMOVED (Google Play policy fix): upfront Permission.photos /
     // Permission.videos requests were removed from here. Google Play's
     // Photo and Video Permissions policy flags apps that request
@@ -45,7 +42,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     // READ_MEDIA_IMAGES / READ_MEDIA_VIDEO are now explicitly removed via
     // tools:node="remove" to stop them being merged in from this package's
     // (and permission_handler's) own manifests.
-
     _decideNextScreen();
   }
 
@@ -57,16 +53,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   Future<void> _decideNextScreen() async {
     final auth = context.read<AuthProvider>();
-
     await Future.wait([
       auth.loadSession(),
       Future.delayed(_minSplashDuration),
     ]);
-
     if (!mounted) return;
-
     Widget next;
-
     if (auth.isLoggedIn) {
       next = const DashboardScreen();
       PushService.initAfterLogin();
@@ -74,7 +66,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       final onboarded = await StorageService.isOnboarded();
       next = onboarded ? const LoginScreen() : const OnboardingScreen();
     }
-
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => next),
     );
@@ -135,96 +126,96 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // ⚠️ RESTORED: light background color (was Colors.transparent,
-      // which let the native black launch background show through).
-      backgroundColor: const Color(0xFFFAF7FC),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            // Faint watermark pattern behind everything else.
-            Positioned.fill(child: _watermarkPattern()),
-
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo lockup: "Tube [real logo] Pilot" — same wordmark
-                  // as before, but the mock bordered play-icon box in the
-                  // middle is now the real logo image.
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
-                      opacity: _logoFade,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          ShaderMask(
-                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                            child: const Text(
-                              'Tube',
-                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+    // Splash is intentionally excluded from the global festival background.
+    // It keeps its own solid off-white + watermark design.
+    return AppBrandBackground(
+      excludeFromFestival: true,
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        // ⚠️ RESTORED: light background color (was Colors.transparent,
+        // which let the native black launch background show through).
+        backgroundColor: const Color(0xFFFAF7FC),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Faint watermark pattern behind everything else.
+              Positioned.fill(child: _watermarkPattern()),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo lockup: "Tube [real logo] Pilot" — same wordmark
+                    // as before, but the mock bordered play-icon box in the
+                    // middle is now the real logo image.
+                    ScaleTransition(
+                      scale: _logoScale,
+                      child: FadeTransition(
+                        opacity: _logoFade,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            ShaderMask(
+                              shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
+                              child: const Text(
+                                'Tube',
+                                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: _realLogo(size: 40),
-                          ),
-                          ShaderMask(
-                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                            child: const Text(
-                              'Pilot',
-                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: _realLogo(size: 40),
                             ),
-                          ),
-                        ],
+                            ShaderMask(
+                              shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
+                              child: const Text(
+                                'Pilot',
+                                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 60),
-
-                  // Large centered brand mark — real logo only, no
-                  // border/box container around it anymore.
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
+                    const SizedBox(height: 60),
+                    // Large centered brand mark — real logo only, no
+                    // border/box container around it anymore.
+                    ScaleTransition(
+                      scale: _logoScale,
+                      child: FadeTransition(
+                        opacity: _logoFade,
+                        child: _realLogo(size: 140),
+                      ),
+                    ),
+                    const SizedBox(height: 26),
+                    FadeTransition(
                       opacity: _logoFade,
-                      child: _realLogo(size: 140),
+                      child: Text(
+                        context.tr('splash_tagline'),
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.purple, letterSpacing: 0.2),
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: 26),
-
-                  FadeTransition(
-                    opacity: _logoFade,
-                    child: Text(
-                      context.tr('splash_tagline'),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.purple, letterSpacing: 0.2),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-
-            // ⚠️ "Powered by TubePilot" centered at the very bottom of the
-            // splash screen.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 18,
-              child: FadeTransition(
-                opacity: _logoFade,
-                child: Center(
-                  child: Text(
-                    context.tr('splash_powered_by'),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.purple.withValues(alpha: 0.65)),
+              // ⚠️ "Powered by TubePilot" centered at the very bottom of the
+              // splash screen.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 18,
+                child: FadeTransition(
+                  opacity: _logoFade,
+                  child: Center(
+                    child: Text(
+                      context.tr('splash_powered_by'),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.purple.withValues(alpha: 0.65)),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

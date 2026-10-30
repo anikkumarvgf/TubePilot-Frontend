@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 import '../providers/language_provider.dart';
 import 'notifications_screen.dart';
 import 'profile_screen.dart';
@@ -34,6 +35,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         ApiService.instance.getAnalytics(),
         ApiService.instance.getNotifications().catchError((_) => <String, dynamic>{}),
       ]);
+      if (!mounted) return;
       setState(() {
         analytics = results[0]['analytics'];
         unreadCount = (results[1]['unreadCount'] as num?)?.toInt() ?? 0;
@@ -49,13 +51,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())).then((_) => _load(showLoader: false));
   }
 
-  // ⚠️ FIX (Boss request — "analyze screen mein question mark hai profile
-  // screen mein but wahan real email honi chahiye"): this avatar used to
-  // be a plain "?" icon that opened a generic help dialog. It now reads
-  // straight from AuthProvider's cached user object — the SAME source of
-  // truth dashboard_screen.dart's avatar uses — so it can never disagree
-  // with what Dashboard/Settings show, and tapping it opens Profile
-  // instead of a help popup.
+  // Avatar reads from AuthProvider's cached user object — the SAME source of
+  // truth dashboard_screen.dart's avatar uses — and opens Profile on tap.
   String? _userEmail(BuildContext context) {
     final user = context.watch<AuthProvider>().user ?? {};
     final email = user['email'];
@@ -75,10 +72,30 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Festival background wrapper — shows the shared festival image when
+    // festival mode is on, and draws nothing extra when it is off.
+    // When this screen is embedded as a tab inside another screen (e.g.
+    // Dashboard), the parent owns the background, so no second wrapper
+    // is added here (avoids drawing the image twice).
+    final screen = _buildScreen(context);
+    if (widget.embedded) return screen;
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: screen,
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     final trend = (analytics?['uploadTrend'] as List?) ?? [];
     final activity = (analytics?['recentActivity'] as List?) ?? [];
     final diamondBalance = (analytics?['remainingUploadCredits'] ?? 0) as num;
     final worthUploads = diamondBalance ~/ _diamondCostPerUpload;
+
+    // Floating nav pill (~64) + its margin (16) + extra gap + system inset.
+    // Only needed when embedded under the dashboard's floating nav; when
+    // standalone, a normal inset is enough.
+    final sysBottom = MediaQuery.paddingOf(context).bottom;
+    final bottomPad = (widget.embedded ? 100.0 : 24.0) + sysBottom;
 
     return Scaffold(
       appBar: AppBar(
@@ -143,17 +160,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           : RefreshIndicator(
               onRefresh: () => _load(showLoader: false),
               child: ListView(
-                // ⚠️ TIGHTENED FURTHER (Boss request — "aur upar karo"):
-                // top padding trimmed from 8 → 4.
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 110),
+                padding: EdgeInsets.fromLTRB(20, 4, 20, bottomPad),
                 children: [
-                  // ⚠️ FIX (Boss request — "BOTTOM OVERFLOWED" red pixel
-                  // errors on every metric card): 1.6 was too short for
-                  // the icon + label + value (+ subtitle) column to fit,
-                  // so every card clipped its bottom row. Lowered to 1.3
-                  // (taller cards) — combined with the tightened
-                  // _MetricCard padding/spacing below — so the content
-                  // fits with room to spare instead of overflowing.
                   GridView.count(
                     padding: EdgeInsets.zero,
                     crossAxisCount: 2,
@@ -189,15 +197,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       ),
                     ],
                   ),
-                  // ⚠️ FIX (Boss request — "gap hai use hatao aur
-                  // componets ko aur upar karo"): 12 → 6, so the chart
-                  // card sits right under the stats grid.
                   const SizedBox(height: 12),
 
                   // ---------------- 14-day upload trend chart ----------------
                   Container(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      border: Border.all(color: context.surfaces.border),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -266,12 +275,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   if (activity.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        border: Border.all(color: context.surfaces.border),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Text(context.tr('no_activity_yet'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
                     )
                   else
                     Container(
-                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        border: Border.all(color: context.surfaces.border),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Column(
                         children: List.generate(activity.length, (i) {
                           final a = activity[i] as Map<String, dynamic>;
@@ -445,12 +462,10 @@ class _MetricCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        // ⚠️ TIGHTENED (Boss's overflow fix, alongside the 1.3 aspect
-        // ratio above): vertical padding 10 → 8, plus the internal gaps
-        // below, so there's extra breathing room even on smaller screens.
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: context.surfaces.card2,
+          // Semi-transparent so festival art never makes text hard to read.
+          color: context.surfaces.card2.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [BoxShadow(color: AppColors.purple.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
         ),

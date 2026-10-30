@@ -47,6 +47,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _slowHintTimer?.cancel();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
     super.dispose();
   }
 
@@ -112,11 +115,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // ⚠️ FIX (Boss request): same off-white base + watermark as Splash.
-      backgroundColor: const Color(0xFFFAF7FC),
-      body: AppBrandBackground(
-        child: SafeArea(
+    // Splash jaisa off-white + watermark. Festival mode on hone par
+    // AppBrandBackground festival image use karega; off hone par normal watermark.
+    return AppBrandBackground(
+      watermarkWhenNormal: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),

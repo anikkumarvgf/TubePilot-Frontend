@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/payu_checkout.dart';
+import '../widgets/app_brand_background.dart';
 import '../providers/language_provider.dart';
 import 'live_plans_screen.dart';
 
@@ -124,47 +125,52 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
           showToast(context, 'Please wait — confirming your payment...', isError: false);
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(context.tr('diamond_store_title')),
-        ),
-        body: loading
-            ? const LoadingView()
-            : SafeArea(
-                bottom: true,
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
-                  children: [
-                    _topSwitcher(),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-                      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text(context.tr('your_balance'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-                        Text('💎 $balance', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                      ]),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(context.tr('choose_package'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    Text(
-                      context.tr('diamond_store_description'),
-                      style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
-                    ),
-                    const SizedBox(height: 16),
-                    ...List.generate(
-                      packages.length,
-                      (index) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: _packageCard(context, index),
+      // Festival background wrapper — festival mode on ho to Diwali image,
+      // off ho to koi extra background nahi.
+      child: AppBrandBackground(
+        watermarkWhenNormal: false,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(context.tr('diamond_store_title')),
+          ),
+          body: loading
+              ? const LoadingView()
+              : SafeArea(
+                  bottom: true,
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
+                    children: [
+                      _topSwitcher(),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                          Text(context.tr('your_balance'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                          Text('💎 $balance', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                        ]),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    _enterpriseCard(),
-                  ],
+                      const SizedBox(height: 20),
+                      Text(context.tr('choose_package'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text(
+                        context.tr('diamond_store_description'),
+                        style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
+                      ),
+                      const SizedBox(height: 16),
+                      ...List.generate(
+                        packages.length,
+                        (index) => Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: _packageCard(context, index),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _enterpriseCard(),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 import '../widgets/competitor_limit_sheet.dart';
 import '../widgets/competitor_widgets.dart';
 import 'competitor_detail_screen.dart';
@@ -302,6 +303,15 @@ class _CompetitorRadarScreenState extends State<CompetitorRadarScreen> {
   // ---------------- build ----------------
   @override
   Widget build(BuildContext context) {
+    // Festival background wrapper — shows the shared festival image when
+    // festival mode is on, and draws nothing extra when it is off.
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: _buildScreen(context),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('radar_title'))),
       body: RefreshIndicator(

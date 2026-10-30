@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/brand_icons.dart';
+import '../widgets/app_brand_background.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -83,6 +84,15 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Festival background wrapper — shows the shared festival image when
+    // festival mode is on, and draws nothing extra when it is off.
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: _buildScreen(context),
+    );
+  }
+
+  Widget _buildScreen(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('about_app_bar_title'))),
       // ⚠️ FIX (Boss request): last card (signature/footer) was being

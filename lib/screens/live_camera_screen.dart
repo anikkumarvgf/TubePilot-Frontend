@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
+import '../widgets/app_brand_background.dart';
 
 /// ⚠️ NEW: Phone ke camera se seedha YouTube par live.
 ///
@@ -511,9 +512,14 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         await _endSession(message: _t('live_cam_stopped'));
         if (mounted) Navigator.of(context).pop();
       },
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('live_cam_title'))),
-        body: SafeArea(child: _buildBody()),
+      // Festival background wrapper — festival mode on ho to Diwali image,
+      // off ho to koi extra background nahi.
+      child: AppBrandBackground(
+        watermarkWhenNormal: false,
+        child: Scaffold(
+          appBar: AppBar(title: Text(context.tr('live_cam_title'))),
+          body: SafeArea(child: _buildBody()),
+        ),
       ),
     );
   }

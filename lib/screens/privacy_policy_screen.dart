@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
+import '../widgets/app_brand_background.dart';
 
 /// Full Privacy Policy — did not previously exist as a file even though
 /// profile_screen.dart already imported and linked to it (a real gap this
@@ -31,85 +32,85 @@ import '../providers/language_provider.dart';
 /// the system nav bar / gesture area on every device.
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
-
   static const String _lastUpdated = 'September 2026';
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.tr('privacy_policy'))),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, 32 + MediaQuery.of(context).padding.bottom),
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Tube Pilot Privacy Policy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 6),
-                  Text('Last updated: $_lastUpdated', style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
-                  const SizedBox(height: 12),
-                  Text(
-                    // ⚠️ FIX (Boss request: hide Facebook & Instagram):
-                    // reference to connecting Facebook/Instagram accounts removed.
-                    'This policy explains, in detail, what Tube Pilot ("the app", "we", "us") collects, why, how it is stored and protected, '
-                    'and what rights you have over it — across every part of the product: connecting your YouTube account, uploading and '
-                    'scheduling video content, and purchasing diamonds. If any section is unclear, Section 6 explains how to reach support '
-                    'directly.',
-                    style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.5),
-                  ),
-                ],
+    return AppBrandBackground(
+      watermarkWhenNormal: false,
+      child: Scaffold(
+        appBar: AppBar(title: Text(context.tr('privacy_policy'))),
+        body: SafeArea(
+          top: false,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 32 + MediaQuery.of(context).padding.bottom),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Tube Pilot Privacy Policy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 6),
+                    Text('Last updated: $_lastUpdated', style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                    const SizedBox(height: 12),
+                    Text(
+                      // ⚠️ FIX (Boss request: hide Facebook & Instagram):
+                      // reference to connecting Facebook/Instagram accounts removed.
+                      'This policy explains, in detail, what Tube Pilot ("the app", "we", "us") collects, why, how it is stored and protected, '
+                      'and what rights you have over it — across every part of the product: connecting your YouTube account, uploading and '
+                      'scheduling video content, and purchasing diamonds. If any section is unclear, Section 6 explains how to reach support '
+                      'directly.',
+                      style: TextStyle(color: context.surfaces.textDim, fontSize: 13, height: 1.5),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            _PolicySection(
-              number: '1',
-              title: 'OAuth 2.0 Authorization — YouTube',
-              initiallyExpanded: true,
-              body: _section1,
-            ),
-            _PolicySection(
-              number: '2',
-              title: 'Data Storage, Token Lifecycle & Auto-Revocation',
-              body: _section2,
-            ),
-            _PolicySection(
-              number: '3',
-              title: 'Video Processing Pipeline',
-              body: _section3,
-            ),
-            _PolicySection(
-              number: '4',
-              title: 'Payment Security & Cashfree Compliance',
-              body: _section4,
-            ),
-            _PolicySection(
-              number: '5',
-              title: 'Your Rights: Access, Correction & Erasure',
-              body: _section5,
-            ),
-            _PolicySection(
-              number: '6',
-              title: 'Disclaimers & Support Escalation',
-              body: _section6,
-            ),
-
-            const SizedBox(height: 20),
-            Center(
-              child: Text(
-                'Questions about this policy can be sent through Help & Support in your Profile.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5),
+              const SizedBox(height: 20),
+              _PolicySection(
+                number: '1',
+                title: 'OAuth 2.0 Authorization — YouTube',
+                initiallyExpanded: true,
+                body: _section1,
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              _PolicySection(
+                number: '2',
+                title: 'Data Storage, Token Lifecycle & Auto-Revocation',
+                body: _section2,
+              ),
+              _PolicySection(
+                number: '3',
+                title: 'Video Processing Pipeline',
+                body: _section3,
+              ),
+              _PolicySection(
+                number: '4',
+                title: 'Payment Security & Cashfree Compliance',
+                body: _section4,
+              ),
+              _PolicySection(
+                number: '5',
+                title: 'Your Rights: Access, Correction & Erasure',
+                body: _section5,
+              ),
+              _PolicySection(
+                number: '6',
+                title: 'Disclaimers & Support Escalation',
+                body: _section6,
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: Text(
+                  'Questions about this policy can be sent through Help & Support in your Profile.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -381,7 +382,6 @@ class PrivacyPolicyScreen extends StatelessWidget {
 }
 
 // ---------------- Internal content models ----------------
-
 class _Sub {
   final String heading;
   final List<String> paragraphs;
@@ -389,13 +389,11 @@ class _Sub {
 }
 
 // ---------------- Section widget ----------------
-
 class _PolicySection extends StatelessWidget {
   final String number;
   final String title;
   final List<_Sub> body;
   final bool initiallyExpanded;
-
   const _PolicySection({
     required this.number,
     required this.title,
