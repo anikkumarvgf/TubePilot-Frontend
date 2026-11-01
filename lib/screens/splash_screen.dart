@@ -9,6 +9,7 @@ import '../providers/theme_provider.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
+import '../widgets/diwali_decor.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -121,6 +122,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     //    is already wrapped globally in main.dart.
     //  * Festival OFF -> exactly the old look (solid off-white + watermark).
     final festivalOn = context.select<ThemeProvider, bool>((p) => p.festivalBackgroundAsset != null);
+
+    // Festival ON -> fully code-drawn Diwali splash (no PNG). Navigation logic above is untouched.
+    if (festivalOn) return const DiwaliSplashView();
 
     return Scaffold(
       backgroundColor: festivalOn ? Colors.transparent : const Color(0xFFFAF7FC),

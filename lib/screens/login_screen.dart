@@ -6,7 +6,7 @@ import '../services/api_service.dart';
 import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
-import '../widgets/app_brand_background.dart';
+import '../widgets/diwali_decor.dart';
 import '../providers/language_provider.dart';
 import 'username_setup_screen.dart';
 import 'dashboard_screen.dart';
@@ -113,39 +113,74 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  InputDecoration _dec(String hint, IconData icon, {Widget? suffix}) => InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, color: DiwaliColors.purple, size: 22),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.6)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: DiwaliColors.purple, width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    // Splash jaisa off-white + watermark. Festival mode on hone par
-    // AppBrandBackground festival image use karega; off hone par normal watermark.
-    return AppBrandBackground(
-      watermarkWhenNormal: true,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
+    // Whole page is drawn in code (DiwaliAuthBackground) - no PNG background.
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: DiwaliAuthBackground(
+        child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              padding: const EdgeInsets.fromLTRB(28, 40, 28, 20),
               child: Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    const SizedBox(height: 10),
                     SizedBox(
                       width: 84,
                       height: 84,
                       child: Image.asset(
                         'assets/splash.png',
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 40),
+                        errorBuilder: (_, __, ___) => const Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 40),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.8),
+                        children: [
+                          TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF1B0F20))),
+                          TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
+                        ],
+                      ),
+                    ),
+                    Text(context.tr('splash_tagline'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13)),
+                    const SizedBox(height: 14),
+                    const DiwaliTitleOrnament(),
                     Text(isLogin ? context.tr('welcome_back') : context.tr('create_account'),
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 6),
+                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 26, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
                     Text(isLogin ? context.tr('sign_in_to_continue') : context.tr('start_scheduling_seconds'),
-                        style: TextStyle(color: context.surfaces.textDim)),
-                    const SizedBox(height: 26),
+                        textAlign: TextAlign.center, style: const TextStyle(color: DiwaliColors.textDim)),
+                    const SizedBox(height: 8),
+                    const DiwaliLotusDivider(width: 190),
+                    const SizedBox(height: 18),
 
                     SizedBox(
                       width: double.infinity,
@@ -155,56 +190,63 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : Image.network(
                                 'https://developers.google.com/identity/images/g-logo.png',
-                                width: 18, height: 18,
-                                errorBuilder: (_, __, ___) => const Text('🔵', style: TextStyle(fontSize: 16)),
+                                width: 20, height: 20,
+                                errorBuilder: (_, __, ___) => const Text('G',
+                                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFFDB4437))),
                               ),
-                        label: Text(isLogin ? context.tr('continue_with_google') : context.tr('signup_with_google')),
+                        label: Text(isLogin ? context.tr('continue_with_google') : context.tr('signup_with_google'),
+                            style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w700)),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          backgroundColor: Colors.white,
+                          shape: const StadiumBorder(),
+                          side: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.7)),
+                        ),
                       ),
                     ),
 
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       child: Row(children: [
-                        Expanded(child: Divider(color: context.surfaces.border)),
+                        Expanded(child: Divider(color: DiwaliColors.gold.withValues(alpha: 0.5))),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(context.tr('or_continue_with_email'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
+                          child: Text(context.tr('or_continue_with_email'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5)),
                         ),
-                        Expanded(child: Divider(color: context.surfaces.border)),
+                        Expanded(child: Divider(color: DiwaliColors.gold.withValues(alpha: 0.5))),
                       ]),
                     ),
 
                     if (!isLogin) ...[
-                      _buildLabel(context, context.tr('full_name_label')),
                       TextFormField(
                         controller: _nameCtrl,
-                        decoration: InputDecoration(hintText: context.tr('your_full_name_hint')),
+                        decoration: _dec(context.tr('your_full_name_hint'), Icons.person_outline),
                         validator: (v) => (v == null || v.trim().isEmpty) ? context.tr('enter_your_name_error') : null,
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                     ],
 
-                    _buildLabel(context, context.tr('email_label')),
                     TextFormField(
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(hintText: 'you@example.com'),
+                      decoration: _dec('you@example.com', Icons.mail_outline),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return context.tr('enter_your_email_error');
                         if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) return context.tr('enter_valid_email_error');
                         return null;
                       },
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
 
-                    _buildLabel(context, context.tr('password_label')),
                     TextFormField(
                       controller: _passwordCtrl,
                       obscureText: obscurePassword,
-                      decoration: InputDecoration(
-                        hintText: '••••••••',
-                        suffixIcon: IconButton(
-                          icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 19),
+                      decoration: _dec(
+                        context.tr('password_label'),
+                        Icons.lock_outline,
+                        suffix: IconButton(
+                          icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              size: 20, color: DiwaliColors.textDim),
                           onPressed: () => setState(() => obscurePassword = !obscurePassword),
                         ),
                       ),
@@ -220,8 +262,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                    const SizedBox(height: 10),
-                    GradientButton(
+                    const SizedBox(height: 14),
+                    DiwaliAuthButton(
                       label: isLogin ? context.tr('login_btn') : context.tr('signup_btn'),
                       loading: loading,
                       onPressed: _submitEmailAuth,
@@ -230,24 +272,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 10),
                       Text(slowServerHint!, style: const TextStyle(color: AppColors.purpleLight, fontSize: 12), textAlign: TextAlign.center),
                     ],
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
-                            style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                            style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13)),
                         GestureDetector(
                           onTap: () => setState(() => isLogin = !isLogin),
                           child: Text(isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
-                              style: const TextStyle(color: AppColors.purpleLight, fontSize: 13, fontWeight: FontWeight.w700)),
+                              style: const TextStyle(color: DiwaliColors.purple, fontSize: 13, fontWeight: FontWeight.w800)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 14),
                     Text(context.tr('terms_privacy_notice'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                        style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5)),
+                    // room so the bottom diya art never covers the last text
+                    const SizedBox(height: 150),
                   ],
                 ),
               ),
@@ -257,12 +301,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-
-  Widget _buildLabel(BuildContext context, String text) => Align(
-        alignment: Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Text(text, style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-        ),
-      );
 }
