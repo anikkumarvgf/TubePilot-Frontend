@@ -656,21 +656,9 @@ class DiwaliAuthBackground extends StatelessWidget {
           right: 0,
           child: IgnorePointer(child: Transform.flip(flipX: true, child: DiwaliGarlands(scale: s))),
         ),
-        if (art == DiwaliArt.auth) ...[
-          // UPDATED: bottom art is smaller and sits lower, so it no longer
-          // covers the "Already have an account?" / Terms lines.
-          Positioned(left: -10, bottom: -6, child: IgnorePointer(child: DiwaliBigDiya(width: 140 * s))),
-          Positioned(
-            right: 10,
-            bottom: 6,
-            child: IgnorePointer(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [DiwaliDiya(width: 26 * s), SizedBox(width: 4 * s), DiwaliDiya(width: 34 * s)],
-              ),
-            ),
-          ),
-        ],
+        // UPDATED: the bottom diya / rangoli art is REMOVED on the auth screen
+        // (it sat behind the "Already have an account?" and Terms lines).
+        // The plum corner swooshes at the bottom are still drawn by _AuthBgPainter.
         child,
       ],
     );
@@ -915,7 +903,7 @@ class DiwaliSplashView extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: h * 0.04,
+                bottom: h * 0.075,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
@@ -927,6 +915,23 @@ class DiwaliSplashView extends StatelessWidget {
                     SizedBox(height: 8),
                     Text('Loading Your Creative Journey…', style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 13.5)),
                   ],
+                ),
+              ),
+              // ---- "Powered by TubePilot" at the very bottom ----
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: h * 0.02,
+                child: const Center(
+                  child: Text(
+                    'Powered by TubePilot',
+                    style: TextStyle(
+                      color: DiwaliColors.purpleDark,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
                 ),
               ),
             ],

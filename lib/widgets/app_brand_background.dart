@@ -74,8 +74,9 @@ class AppBrandBackground extends StatelessWidget {
   /// cover fills the height and crops the sides — the hanging diyas get cut
   /// at the screen edge. Instead the image is shown at FULL WIDTH. On tall
   /// screens the top half is pinned to the top and the bottom half to the
-  /// bottom; the middle of the artwork is plain cream, which the Container
-  /// colour continues, so no seam is visible.
+  /// bottom; the gap in the middle is filled by a soft, stretched copy of the
+  /// same image (see softBase below) and the halves fade into it, so no seam
+  /// or colour band is visible.
   Widget _imageBackground(BuildContext context, String asset) {
     final size = MediaQuery.sizeOf(context);
     final dpr = MediaQuery.devicePixelRatioOf(context);
@@ -85,23 +86,53 @@ class AppBrandBackground extends StatelessWidget {
 
     Widget fallback(BuildContext c, Object e, StackTrace? s) => _watermarkPattern();
 
+    // FIX (middle band / "cut" on tall phones):
+    //  * Before: the gap between the two halves showed a flat colour
+    //    (festivalIvory) that does NOT match the PNG's own cream, so a
+    //    visible band appeared in the middle of every screen.
+    //  * Now: (1) a tiny copy of the SAME image is stretched over the whole
+    //    screen as a base layer - decoded at ~48px wide so the upscale is
+    //    naturally soft/blurred (cheap, no blur filter), so the gap gets the
+    //    image's own colours; (2) the inner edge of each half fades out
+    //    (ShaderMask) so the halves melt into that base - no hard seam.
+    Widget softBase() => Positioned.fill(
+          child: Image.asset(
+            asset,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.medium,
+            gaplessPlayback: true,
+            cacheWidth: 48,
+            errorBuilder: (c, e, s) => const SizedBox.shrink(),
+          ),
+        );
+
     Widget half({required bool top}) => Positioned(
           left: 0,
           right: 0,
           top: top ? 0 : null,
           bottom: top ? null : bottomReserve,
           height: imgH / 2,
-          child: ClipRect(
-            child: Align(
-              alignment: top ? Alignment.topCenter : Alignment.bottomCenter,
-              heightFactor: 0.5,
-              child: Image.asset(
-                asset,
-                width: w,
-                fit: BoxFit.fitWidth,
-                gaplessPlayback: true,
-                cacheWidth: cacheW,
-                errorBuilder: fallback,
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            // Fade only the edge that faces the middle of the screen.
+            shaderCallback: (rect) => LinearGradient(
+              begin: top ? Alignment.topCenter : Alignment.bottomCenter,
+              end: top ? Alignment.bottomCenter : Alignment.topCenter,
+              colors: const [Colors.white, Colors.white, Colors.transparent],
+              stops: const [0.0, 0.84, 1.0],
+            ).createShader(rect),
+            child: ClipRect(
+              child: Align(
+                alignment: top ? Alignment.topCenter : Alignment.bottomCenter,
+                heightFactor: 0.5,
+                child: Image.asset(
+                  asset,
+                  width: w,
+                  fit: BoxFit.fitWidth,
+                  gaplessPlayback: true,
+                  cacheWidth: cacheW,
+                  errorBuilder: fallback,
+                ),
               ),
             ),
           ),
@@ -112,7 +143,7 @@ class AppBrandBackground extends StatelessWidget {
     return ExcludeSemantics(
       child: IgnorePointer(
         child: tallScreen
-            ? Stack(children: [half(top: true), half(top: false)])
+            ? Stack(children: [softBase(), half(top: true), half(top: false)])
             // Short / wide screens: cover is fine, nothing important is cut.
             : Image.asset(
                 asset,

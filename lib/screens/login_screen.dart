@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 40, 28, 20),
+              padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -281,48 +281,35 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: 14),
 
-                    // UPDATED: both bottom lines are now DARK BLACK and sit on a
-                    // soft cream strip, so the diya art behind can never make
-                    // them hard to read.
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: DiwaliColors.creamTop.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
-                                  style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 14, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () => setState(() => isLogin = !isLogin),
-                                child: Text(
-                                  isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
-                                  style: const TextStyle(color: DiwaliColors.purple, fontSize: 14, fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                            ],
+                    // Dark black bottom lines, NO background box. The bottom diya
+                    // art was removed from the auth background, so nothing sits
+                    // behind these lines any more.
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
+                            style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 14, fontWeight: FontWeight.w600),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            context.tr('terms_privacy_notice'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => isLogin = !isLogin),
+                          child: Text(
+                            isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
+                            style: const TextStyle(color: DiwaliColors.purple, fontSize: 14, fontWeight: FontWeight.w800),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    // room so the bottom diya art never covers the last text
-                    const SizedBox(height: 90),
+                    const SizedBox(height: 8),
+                    Text(
+                      context.tr('terms_privacy_notice'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
