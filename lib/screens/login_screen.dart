@@ -7,6 +7,7 @@ import '../services/push_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/diwali_decor.dart';
+import '../widgets/diwali_popups.dart';
 import '../providers/language_provider.dart';
 import 'username_setup_screen.dart';
 import 'dashboard_screen.dart';
@@ -70,6 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await auth.emailLogin(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
       } else {
         await auth.emailSignup(name: _nameCtrl.text.trim(), email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+        await markDiwaliWelcomePending(); // new account -> welcome popup once
       }
       if (!mounted) return;
       PushService.initAfterLogin();
@@ -88,6 +90,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     try {
       await auth.googleLogin();
+      // Google: welcome only if the account was created just now (new user).
+      final created = DateTime.tryParse('${auth.user?['createdAt'] ?? ''}');
+      if (created != null && DateTime.now().difference(created).inMinutes.abs() < 10) {
+        await markDiwaliWelcomePending();
+      }
       if (!mounted) return;
       PushService.initAfterLogin();
       _goNext(auth.user);
@@ -274,24 +281,48 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: 14),
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
-                            style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13)),
-                        GestureDetector(
-                          onTap: () => setState(() => isLogin = !isLogin),
-                          child: Text(isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
-                              style: const TextStyle(color: DiwaliColors.purple, fontSize: 13, fontWeight: FontWeight.w800)),
-                        ),
-                      ],
+                    // UPDATED: both bottom lines are now DARK BLACK and sit on a
+                    // soft cream strip, so the diya art behind can never make
+                    // them hard to read.
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: DiwaliColors.creamTop.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
+                                  style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 14, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                onTap: () => setState(() => isLogin = !isLogin),
+                                child: Text(
+                                  isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
+                                  style: const TextStyle(color: DiwaliColors.purple, fontSize: 14, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            context.tr('terms_privacy_notice'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 14),
-                    Text(context.tr('terms_privacy_notice'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5)),
                     // room so the bottom diya art never covers the last text
-                    const SizedBox(height: 150),
+                    const SizedBox(height: 90),
                   ],
                 ),
               ),

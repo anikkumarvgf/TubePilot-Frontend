@@ -29,7 +29,6 @@ import 'competitor_radar_screen.dart';
 import 'smart_scheduler_screen.dart';
 import 'visual_analyzer_screen.dart';
 import 'channel_audit_screen.dart';
-import 'wallet_refund_logs_screen.dart';
 import 'my_videos_screen.dart';
 import 'live_stream_screen.dart'; // Live Streaming feature
 
@@ -624,18 +623,17 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             _divider(),
             _menuRow(Icons.video_collection_rounded, context.tr('menu_my_videos'), AppColors.purple,
                 () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyVideosScreen()))),
-            _divider(),
-            _menuRow(Icons.receipt_long_rounded, context.tr('menu_wallet_refund_logs'), AppColors.purple,
-                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletRefundLogsScreen()))),
           ]),
           const SizedBox(height: 20),
           // Subscription & Wallet comes FIRST, Buy Diamonds second.
           _menuCard([
-            _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
-                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
-            _divider(),
-            _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
+            // "Buy Diamonds" is now "Subscription" (plans / diamond packs).
+            _menuRow(Icons.workspace_premium_rounded, 'Subscription', AppColors.diamond,
                 () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
+            _divider(),
+            // Wallet + transactions + purchases + refund logs, all in one page.
+            _menuRow(Icons.account_balance_wallet_rounded, context.tr('subscription_wallet'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
             _divider(),
             _menuRow(Icons.card_giftcard_rounded, context.tr('menu_gift_code'), AppColors.diamond,
                 () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),

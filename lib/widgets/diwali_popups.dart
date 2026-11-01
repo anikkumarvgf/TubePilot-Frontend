@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../providers/theme_provider.dart';
 import 'brand_icons.dart';
 import 'diwali_decor.dart';
 
 /// Diwali style popups (cream + gold + plum), shared by the whole app.
 ///
 ///  * [DiwaliPopupShell]            -> card jisme koi bhi popup ka content daalo
+///  * [DiwaliDialog]                -> NEW: chhota Diwali alert dialog (icon + title + content + buttons)
+///  * [DiwaliDialogButton]          -> NEW: plum gradient button for DiwaliDialog
 ///  * [showDiwaliWelcome]           -> "Welcome to TubePilot / Happy Diwali" popup
 ///  * [maybeShowDiwaliWelcome]      -> sirf ek baar dikhata hai (SharedPreferences)
 ///  * [showDiwaliConnectYoutube]    -> chhota "Connect Your YouTube Channel" popup
-///  * [showDiwaliSheet]             -> ⚠️ NEW: Diwali bottom sheet (help / options menus)
-///      + [DiwaliSheetTitle], [DiwaliSheetTile], [DiwaliSheetDivider]
 ///
 /// Rate Us / baaki popups ko bhi isi shell mein daal sakte ho.
 
@@ -112,239 +110,123 @@ class DiwaliPopupShell extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// ⚠️ NEW — Diwali bottom sheet
+// NEW: small Diwali alert dialog (replaces the plain white AlertDialog).
 //
-// Why: showModalBottomSheet routes are NOT PageRoutes, so the global Diwali
-// page background never reaches them -> sheets were plain white. Use this
-// instead of showModalBottomSheet:
+//   DiwaliDialog(
+//     icon: Icons.link_rounded,
+//     title: 'Connect Your Channel',
+//     content: Text('...'),
+//     actions: [ ...buttons... ],   // placed in one row
+//   )
 //
-//   final k = await showDiwaliSheet<String>(
-//     context: context,
-//     builder: (sheetContext) => Column(
-//       mainAxisSize: MainAxisSize.min,
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         const DiwaliSheetTitle(text: 'What do you need help with?'),
-//         DiwaliSheetTile(icon: Icons.payments_rounded, title: 'Payment',
-//             onTap: () => Navigator.pop(sheetContext, 'payment')),
-//       ],
-//     ),
-//   );
-//
-// The sheet shows the same festival artwork as the pages (hanging diyas at the
-// top corners), and keeps its content ABOVE the Android system navigation area
-// (3-button bar and gesture bar) and above the keyboard.
+// Look: cream card, gold border, hanging diyas at the top corners, gold icon
+// circle, lotus divider, plum buttons. No close "X" (Skip button does that).
 // ---------------------------------------------------------------------------
-Future<T?> showDiwaliSheet<T>({
-  required BuildContext context,
-  required WidgetBuilder builder,
-  bool isDismissible = true,
-}) {
-  return showModalBottomSheet<T>(
-    context: context,
-    isScrollControlled: true,
-    // Keeps the sheet clear of the status bar / notch (top, left, right).
-    // The bottom is handled inside _DiwaliSheetFrame with SafeArea.
-    useSafeArea: true,
-    isDismissible: isDismissible,
-    backgroundColor: Colors.transparent,
-    elevation: 0,
-    barrierColor: Colors.black54,
-    builder: (sheetContext) => _DiwaliSheetFrame(child: builder(sheetContext)),
-  );
-}
-
-class _DiwaliSheetFrame extends StatelessWidget {
-  final Widget child;
-  const _DiwaliSheetFrame({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = context.watch<ThemeProvider>().festivalBackgroundAsset;
-    final width = MediaQuery.sizeOf(context).width;
-    // Top half of the 9:16 festival artwork (1152 x 2048).
-    final artHeight = width * (2048 / 1152) / 2;
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    const radius = Radius.circular(28);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: DiwaliColors.creamTop,
-        borderRadius: const BorderRadius.vertical(top: radius),
-        border: Border(
-          top: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.8), width: 1.4),
-          left: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4), width: 1),
-          right: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4), width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, -6)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(27)),
-        child: Stack(
-          children: [
-            if (asset != null)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: artHeight,
-                child: IgnorePointer(
-                  child: ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    // Fade the artwork out downwards so list text stays readable.
-                    shaderCallback: (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white, Colors.white, Colors.transparent],
-                      stops: [0.0, 0.5, 1.0],
-                    ).createShader(rect),
-                    child: ClipRect(
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        heightFactor: 0.5,
-                        child: Image.asset(
-                          asset,
-                          width: width,
-                          fit: BoxFit.fitWidth,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            // ⚠️ SafeArea (bottom) = system 3-button bar / gesture bar. The cream
-            // background above still runs behind it, so there is no gap.
-            SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(0, 10, 0, 12 + keyboard),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
-                        decoration: BoxDecoration(
-                          color: DiwaliColors.gold.withValues(alpha: 0.75),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                    child,
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Sheet heading. Side padding (36) keeps it clear of the hanging diyas.
-class DiwaliSheetTitle extends StatelessWidget {
-  final String text;
-  final Widget? leading;
-  const DiwaliSheetTitle({super.key, required this.text, this.leading});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(36, 4, 36, 8),
-      child: Row(
-        children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 12)],
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One row of a Diwali sheet: icon in a beige circle, title, optional subtitle,
-/// chevron. [danger] makes it red (e.g. Disconnect).
-class DiwaliSheetTile extends StatelessWidget {
-  final IconData? icon;
-  final Widget? leading;
+class DiwaliDialog extends StatelessWidget {
+  final IconData icon;
   final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final bool danger;
-  final VoidCallback? onTap;
-
-  const DiwaliSheetTile({
+  final Widget content;
+  final List<Widget> actions;
+  const DiwaliDialog({
     super.key,
+    required this.icon,
     required this.title,
-    this.icon,
-    this.leading,
-    this.subtitle,
-    this.trailing,
-    this.danger = false,
-    this.onTap,
+    required this.content,
+    required this.actions,
   });
 
   @override
   Widget build(BuildContext context) {
-    const red = Color(0xFFDC2626);
-    final color = danger ? red : DiwaliColors.purpleDark;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.iconCircle),
-              child: leading ?? Icon(icon ?? Icons.circle_outlined, color: color, size: 20),
+    return DiwaliPopupShell(
+      maxWidth: 360,
+      padding: const EdgeInsets.fromLTRB(24, 30, 24, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: DiwaliColors.iconCircle,
+              border: Border.all(color: DiwaliColors.gold.withValues(alpha: 0.8), width: 1.4),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: color, fontSize: 14.5, fontWeight: FontWeight.w600)),
-                  if (subtitle != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(subtitle!, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            trailing ?? const Icon(Icons.chevron_right_rounded, color: DiwaliColors.textDim, size: 22),
-          ],
-        ),
+            child: Icon(icon, color: DiwaliColors.purpleDeep, size: 26),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+          ),
+          const SizedBox(height: 6),
+          const DiwaliLotusDivider(width: 140),
+          const SizedBox(height: 12),
+          DefaultTextStyle(
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 14, height: 1.4),
+            child: content,
+          ),
+          const SizedBox(height: 18),
+          Row(children: actions),
+        ],
       ),
     );
   }
 }
 
-class DiwaliSheetDivider extends StatelessWidget {
-  const DiwaliSheetDivider({super.key});
+/// Plum gradient pill button for [DiwaliDialog] (use inside `actions`, it
+/// already wraps itself in Expanded).
+class DiwaliDialogButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final bool primary;
+  const DiwaliDialogButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.primary = true,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 36),
-      color: DiwaliColors.cardBorder.withValues(alpha: 0.55),
+    if (!primary) {
+      // Secondary (Skip): plain dark-plum text, no fill.
+      return Expanded(
+        child: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: DiwaliColors.purpleDark,
+            minimumSize: const Size.fromHeight(46),
+            shape: const StadiumBorder(),
+          ),
+          onPressed: onPressed,
+          child: Text(label, style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w800, fontSize: 15)),
+        ),
+      );
+    }
+    return Expanded(
+      child: GestureDetector(
+        onTap: (loading || onPressed == null) ? null : onPressed,
+        child: Opacity(
+          opacity: onPressed == null && !loading ? 0.6 : 1,
+          child: Container(
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [DiwaliColors.purple, DiwaliColors.purpleDark]),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: DiwaliColors.goldLight, width: 1.3),
+              boxShadow: [BoxShadow(color: DiwaliColors.purpleDark.withValues(alpha: 0.25), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: loading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -433,12 +315,25 @@ Future<void> showDiwaliWelcome(BuildContext context) {
 }
 
 /// Sirf pehli baar dikhata hai. true = dikhaya gaya.
-Future<bool> maybeShowDiwaliWelcome(BuildContext context) async {
-  bool already = false;
+const String kDiwaliWelcomePendingKey = 'diwali_welcome_pending_v1';
+
+/// Call right after a NEW account is created (sign-up). Only then will the
+/// welcome popup be shown - once.
+Future<void> markDiwaliWelcomePending() async {
   try {
     final prefs = await SharedPreferences.getInstance();
-    already = prefs.getBool(kDiwaliWelcomeShownKey) ?? false;
-    if (already) return false;
+    await prefs.setBool(kDiwaliWelcomePendingKey, true);
+  } catch (_) {}
+}
+
+/// Shows the welcome popup ONLY if a sign-up just happened (pending flag set),
+/// then clears the flag. Normal app opens / logins never show it.
+Future<bool> maybeShowDiwaliWelcome(BuildContext context) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getBool(kDiwaliWelcomePendingKey) ?? false;
+    if (!pending) return false;
+    await prefs.setBool(kDiwaliWelcomePendingKey, false); // clear BEFORE showing
     await prefs.setBool(kDiwaliWelcomeShownKey, true);
   } catch (_) {
     return false;
@@ -718,6 +613,217 @@ class DiwaliConnectYoutubeDialog extends StatelessWidget {
               SizedBox(width: 5),
               Text('Secure & Read Only Access', style: TextStyle(color: DiwaliColors.textDim, fontSize: 10.5)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+// =============================================================================
+// Diwali bottom sheet helpers (used by Profile: Help & Support, YouTube options)
+// =============================================================================
+
+/// Cream bottom sheet with rounded top; content stays above the system bar.
+Future<T?> showDiwaliSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      return Container(
+        decoration: BoxDecoration(
+          color: DiwaliColors.creamTop,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+          border: Border.all(color: DiwaliColors.gold.withValues(alpha: 0.5)),
+        ),
+        padding: EdgeInsets.fromLTRB(0, 10, 0, 12 + MediaQuery.paddingOf(sheetContext).bottom),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: DiwaliColors.gold.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Material(type: MaterialType.transparency, child: builder(sheetContext)),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class DiwaliSheetTitle extends StatelessWidget {
+  final String text;
+  const DiwaliSheetTitle({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+      child: Text(
+        text,
+        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 18, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+class DiwaliSheetDivider extends StatelessWidget {
+  const DiwaliSheetDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 24,
+      endIndent: 24,
+      color: DiwaliColors.cardBorder.withValues(alpha: 0.6),
+    );
+  }
+}
+
+class DiwaliSheetTile extends StatelessWidget {
+  final Widget? leading;
+  final IconData? icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final bool danger;
+  final VoidCallback? onTap;
+  const DiwaliSheetTile({
+    super.key,
+    this.leading,
+    this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+    this.danger = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = danger ? const Color(0xFFC62828) : DiwaliColors.purpleDark;
+    final lead = leading ?? (icon != null ? Icon(icon, color: danger ? color : DiwaliColors.purpleDeep, size: 20) : null);
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+      leading: lead == null
+          ? null
+          : Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: DiwaliColors.iconCircle, shape: BoxShape.circle),
+              child: lead,
+            ),
+      title: Text(title, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14.5)),
+      subtitle: subtitle == null ? null : Text(subtitle!, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
+      trailing: trailing ?? const Icon(Icons.chevron_right_rounded, color: DiwaliColors.textDim),
+    );
+  }
+}
+
+
+// =============================================================================
+// Subscription offer popup: Rs1 = 20 uploads, then Rs10 (30 uploads + 99 diamonds) when credits end
+// =============================================================================
+const String kSubscriptionPopupLastShownKey = 'subscription_popup_last_shown_ms';
+
+/// Returns true when the user taps "Pay ₹1 & Start". Numbers come from the backend offer.
+Future<bool> showSubscriptionOfferPopup(
+  BuildContext context, {
+  required num intro,
+  required num plan,
+  required int diamonds,
+  int introUploads = 20,
+  int planUploads = 30,
+}) async {
+  final r = await showDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    builder: (_) => _SubscriptionOfferDialog(
+      intro: intro,
+      plan: plan,
+      diamonds: diamonds,
+      introUploads: introUploads,
+      planUploads: planUploads,
+    ),
+  );
+  return r == true;
+}
+
+class _SubscriptionOfferDialog extends StatelessWidget {
+  final num intro;
+  final num plan;
+  final int diamonds;
+  final int introUploads;
+  final int planUploads;
+  const _SubscriptionOfferDialog({
+    required this.intro,
+    required this.plan,
+    required this.diamonds,
+    required this.introUploads,
+    required this.planUploads,
+  });
+
+  Widget _row(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          _GoldCircle(icon: icon, size: 32, iconSize: 17),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w600))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return DiwaliPopupShell(
+      onClose: () => Navigator.of(context).pop(false),
+      padding: const EdgeInsets.fromLTRB(24, 30, 24, 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$introUploads uploads for just ₹$intro',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 22, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'then ₹$plan autopay only when your uploads end',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          _row(Icons.cloud_upload_outlined, '$introUploads uploads right away'),
+          _row(Icons.autorenew_rounded, 'Then ₹$plan = $planUploads uploads + $diamonds diamonds'),
+          _row(Icons.notifications_active_outlined, '24-hour notice before every debit'),
+          const SizedBox(height: 10),
+          Text(
+            'When your $introUploads uploads are used, we notify you and ₹$plan is auto-debited after 24 hours. '
+            'Your month starts from that day. Cancel anytime in Profile → Subscription.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5, height: 1.4),
+          ),
+          const SizedBox(height: 14),
+          DiwaliButton(label: 'Pay ₹$intro & Start', onTap: () => Navigator.of(context).pop(true)),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Maybe later', style: TextStyle(color: DiwaliColors.textDim)),
           ),
         ],
       ),

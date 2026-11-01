@@ -9,6 +9,8 @@ import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
 import '../widgets/custom_dropdown.dart';
 import '../widgets/app_brand_background.dart';
+// ₹1 offer popup (again only when the user tries to upload / generate with no credits, max once per 24h)
+import '../widgets/subscription_offer.dart';
 
 class UploadScreen extends StatefulWidget {
   final bool embedded;
@@ -55,15 +57,9 @@ class _UploadScreenState extends State<UploadScreen> {
   // 50-100 video bulk flow.
   final List<_VideoItem> videos = [];
 
-  // ⚠️ FIX (Boss request — "abhi hamara sirf YouTube hi hai"): the
-  // Facebook/Instagram business verification is still pending and only
-  // YouTube has launched, so there is no real choice to present to the
-  // user anymore. selectedPlatforms is now ALWAYS {'youtube'} from the
-  // moment this screen opens — no manual platform-selector icon is shown
-  // (see build() below), so every upload automatically targets YouTube.
-  // The Set is kept (rather than a single String) so the rest of the file
-  // — _videoCard(), _submit(), the bulk-upload item builder — didn't need
-  // to change; they all still just check `selectedPlatforms.contains(...)`.
+  // Only YouTube is launched (Facebook/Instagram verification pending), so
+  // selectedPlatforms is ALWAYS {'youtube'}. The Set is kept so the rest of the
+  // file still just checks `selectedPlatforms.contains(...)`.
   final Set<String> selectedPlatforms = {'youtube'};
 
   // Connection status, loaded once on init (from /dashboard + /meta/status +
@@ -81,16 +77,8 @@ class _UploadScreenState extends State<UploadScreen> {
   final _ytPlaylistCtrl = TextEditingController();
 
   // ---------------- Shared media-type (Facebook/Instagram, applies to whole batch) ----------------
-  // Backend Video.postType enum: video | reel | carousel | post. Carousel
-  // is handled by its own dedicated mini-flow below (multi-image + caption),
-  // not through the per-video bulk list, since it needs already-hosted
-  // image URLs rather than a single video file.
   String postType = 'reel';
 
-  // Internal (non-translated) keys — the display label is looked up via
-  // context.tr() in these helpers below, but the KEY stored in state (and
-  // sent to the backend) always stays a stable English/code identifier
-  // regardless of the selected app language.
   Map<String, String> _postTypeLabels(BuildContext c) => {
         'reel': c.tr('up_posttype_reel'),
         'video': c.tr('up_posttype_video'),
@@ -117,11 +105,6 @@ class _UploadScreenState extends State<UploadScreen> {
       };
 
   // ---------------- Scheduling ----------------
-  // One publish time for the whole batch, across every platform — no
-  // per-video/per-platform scheduling. Toggle reveals the picker.
-  // "Schedule" is the default mode per spec (was previously "Live"/off by
-  // default). Live mode bypasses the 1-hour minimum buffer entirely —
-  // see _submit()'s scheduledIso computation and _pickDateTime's guard.
   bool scheduleEnabled = true;
   DateTime? scheduledAt;
 
@@ -174,6 +157,17 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  // ⚠️ NEW: if an API call failed because the user has no diamonds / upload credits, offer the ₹1 plan
+  // (only if eligible, max once per 24h). Returns true when the user went to pay, so the caller can stop.
+  Future<bool> _offerIfNoCredits(Object e) async {
+    if (e is ApiException && e.code == 'INSUFFICIENT_DIAMONDS' && mounted) {
+      final started = await showSubscriptionOfferIfNeeded(context);
+      if (started) _loadInitialData();
+      return started;
+    }
+    return false;
+  }
+
   // ---------------- Video pickers ----------------
   Future<void> _pickSingleVideo() async {
     final picker = ImagePicker();
@@ -221,7 +215,7 @@ class _UploadScreenState extends State<UploadScreen> {
     });
   }
 
-  // ---------------- Shared pickers (same pattern as before) ----------------
+  // ---------------- Shared pickers ----------------
   Future<String?> _showOptionPicker({required String title, required Map<String, String> options, required String current}) {
     return showModalBottomSheet<String>(
       context: context,
@@ -315,9 +309,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   // Business Rule: a scheduled post must always be at least 1 hour from
-  // now — mirrors the backend's MIN_SCHEDULE_BUFFER_MS guard in
-  // routes/video.js so the user sees this instantly instead of only
-  // finding out after the upload request round-trips and fails.
+  // now — mirrors the backend's MIN_SCHEDULE_BUFFER_MS guard in routes/video.js.
   static const _minScheduleBuffer = Duration(hours: 1);
 
   Future<DateTime?> _pickDateTime(DateTime? current) async {
@@ -358,7 +350,7 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  // ---------------- AI generation (per-video) ----------------
+  // ---------------- AI generation (per-video) — every AI action = 1 diamond (server side) ----------------
   Future<void> _generateYoutube(_VideoItem item, String field) async {
     final topic = await _promptTopic(item.ytTitleCtrl);
     if (topic == null || topic.isEmpty) return;
@@ -376,6 +368,7 @@ class _UploadScreenState extends State<UploadScreen> {
       }
       if (mounted) showToast(context, context.tr('up_ai_content_generated'), isSuccess: true);
     } catch (e) {
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showAiError(context, e);
     }
   }
@@ -389,6 +382,7 @@ class _UploadScreenState extends State<UploadScreen> {
       item.fbCaptionCtrl.text = res['caption'] ?? '';
       if (mounted) showToast(context, context.tr('up_ai_caption_generated'), isSuccess: true);
     } catch (e) {
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showAiError(context, e);
     }
   }
@@ -402,6 +396,7 @@ class _UploadScreenState extends State<UploadScreen> {
       item.fbHashtagsCtrl.text = (res['hashtags'] as List).join(', ');
       if (mounted) showToast(context, context.tr('up_ai_hashtags_generated'), isSuccess: true);
     } catch (e) {
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showAiError(context, e);
     }
   }
@@ -415,6 +410,7 @@ class _UploadScreenState extends State<UploadScreen> {
       item.igCaptionCtrl.text = res['caption'] ?? '';
       if (mounted) showToast(context, context.tr('up_ai_caption_generated'), isSuccess: true);
     } catch (e) {
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showAiError(context, e);
     }
   }
@@ -428,6 +424,7 @@ class _UploadScreenState extends State<UploadScreen> {
       item.igHashtagsCtrl.text = (res['hashtags'] as List).join(', ');
       if (mounted) showToast(context, context.tr('up_ai_hashtags_generated'), isSuccess: true);
     } catch (e) {
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showAiError(context, e);
     }
   }
@@ -437,7 +434,7 @@ class _UploadScreenState extends State<UploadScreen> {
   // dialog; the backend is always the source of truth for the actual charge.
   static const _diamondCostPerUpload = 10;
 
-  /// Shows a confirmation dialog with how many free uploads / diamonds this
+  /// Shows a confirmation dialog with how many plan uploads / diamonds this
   /// batch will use before anything is actually submitted, so the user
   /// isn't surprised mid-batch. Returns true if they confirmed.
   Future<bool> _confirmCreditUsage() async {
@@ -493,13 +490,8 @@ class _UploadScreenState extends State<UploadScreen> {
         if (scheduledIso != null) 'scheduledAt': scheduledIso,
       };
 
-  // ---------------- Submit (single video -> /videos/upload, batch -> /videos/bulk-upload) ----------------
   // ---------------- Reset to initial state after a successful publish ----------------
-  // Per spec: instead of leaving the screen, clear everything (videos,
-  // titles/hashtags/captions, thumbnails, schedule) and land back on the
-  // empty "Tap to select videos" state, ready for another upload without
-  // re-navigating. selectedPlatforms is intentionally NOT cleared here —
-  // it always stays {'youtube'} since that's the only launched platform.
+  // selectedPlatforms is intentionally NOT cleared — it always stays {'youtube'}.
   void _resetForm() {
     for (final v in videos) {
       v.dispose();
@@ -515,8 +507,11 @@ class _UploadScreenState extends State<UploadScreen> {
       uploadedCount = 0;
     });
     _ytPlaylistCtrl.clear();
+    // plan uploads / diamonds just changed — refresh the cost label
+    _loadInitialData();
   }
 
+  // ---------------- Submit (single video -> /videos/upload, batch -> /videos/bulk-upload) ----------------
   Future<void> _submit() async {
     if (videos.isEmpty) {
       showToast(context, context.tr('up_select_video_error'), isError: true);
@@ -538,6 +533,17 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
 
+    // ⚠️ NEW: no plan uploads left AND not enough diamonds for even one upload -> show the ₹1 offer
+    // (once per 24h, only if eligible). If the user starts paying we stop here; otherwise the normal
+    // "not enough credits" message below is shown.
+    if (freeUploadsRemaining <= 0 && diamondBalance < _diamondCostPerUpload) {
+      final started = await showSubscriptionOfferIfNeeded(context);
+      if (started) {
+        _loadInitialData();
+        return;
+      }
+    }
+
     final proceed = await _confirmCreditUsage();
     if (!proceed) return;
 
@@ -552,7 +558,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
     try {
       if (videos.length == 1) {
-        // -------- Single video: /videos/upload (unchanged happy path) --------
+        // -------- Single video: /videos/upload --------
         final item = videos.first;
         Map<String, dynamic>? youtube;
         Map<String, dynamic>? facebook;
@@ -597,10 +603,7 @@ class _UploadScreenState extends State<UploadScreen> {
         );
         _resetForm();
       } else {
-        // -------- Bulk: /videos/bulk-upload — backend auto-slots across
-        // days (today skipped, plan's daily cap applied); scheduleEnabled's
-        // time-of-day (if set) is used as the preferred publish time on
-        // every auto-assigned day. --------
+        // -------- Bulk: /videos/bulk-upload — backend auto-slots across days --------
         final items = videos
             .map((item) => {
                   if (selectedPlatforms.contains('youtube')) ...{
@@ -649,12 +652,9 @@ class _UploadScreenState extends State<UploadScreen> {
         }
       }
     } catch (e) {
-      // ⚠️ FIX (Boss request): was showApiError() before — showed the
-      // raw backend text even when the failure was an insufficient-
-      // diamond shortfall. showUploadError() shows the same clear
-      // upgrade prompt as the AI-generate buttons for that one case,
-      // while still showing the backend's own message for any other
-      // upload failure (see common.dart for the shared detection logic).
+      // Insufficient credits from the server -> ₹1 offer first (if eligible / not shown in the last 24h),
+      // otherwise the usual upload error message.
+      if (await _offerIfNoCredits(e)) return;
       if (mounted) showUploadError(context, e);
     } finally {
       if (mounted) setState(() => uploading = false);
@@ -662,10 +662,6 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   // ---------------- UI helpers ----------------
-  // Deprecated in favor of the shared PickerField widget (see
-  // widgets/custom_dropdown.dart) for the global circular-pill styling —
-  // kept as a thin wrapper so every existing `_pickerField(...)` call site
-  // in this file didn't need to be touched individually.
   Widget _pickerField({required String value, required VoidCallback onTap, bool isPlaceholder = false}) {
     return PickerField(value: value, onTap: onTap, isPlaceholder: isPlaceholder);
   }
@@ -768,18 +764,8 @@ class _UploadScreenState extends State<UploadScreen> {
                       ]),
                     ),
                   ],
-                  // ⚠️ HIDDEN (Boss request — "Facebook/Instagram verification
-                  // pending, YouTube verification complete hai, sirf YouTube
-                  // launch kar rahe hain"): these Facebook/Instagram per-video
-                  // field blocks are UNCHANGED and still work exactly as
-                  // before — they are simply unreachable right now because
-                  // `selectedPlatforms` can never contain 'facebook' or
-                  // 'instagram' anymore (it's hard-coded to {'youtube'}
-                  // above, and the manual platform-selector UI that used to
-                  // let the user add them was removed from build() below).
-                  // Nothing here needs to be touched again once FB/IG
-                  // verification completes — just restore the selector UI
-                  // and these blocks light back up immediately.
+                  // HIDDEN (only YouTube is launched): Facebook/Instagram per-video blocks are unchanged and
+                  // light up again as soon as `selectedPlatforms` can contain 'facebook' / 'instagram'.
                   if (selectedPlatforms.contains('facebook')) ...[
                     if (selectedPlatforms.contains('youtube')) const SizedBox(height: 16),
                     Row(children: [
@@ -843,9 +829,7 @@ class _UploadScreenState extends State<UploadScreen> {
       appBar: AppBar(
         title: Text(context.tr('up_title')),
         actions: [
-          // "Bulk" now lives in the header (top-right) instead of a
-          // "+ Add more" text button inside the body — same action
-          // (_pickMoreVideos), just relocated per the header spec.
+          // "Bulk" lives in the header (top-right) — same action (_pickMoreVideos).
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
@@ -886,20 +870,10 @@ class _UploadScreenState extends State<UploadScreen> {
                 ],
                 const SizedBox(height: 12),
 
-                // ⚠️ REMOVED (Boss request — "sirf YouTube hi hai, icon hata
-                // do, hamesha YouTube hi select ho"): the "Publish To"
-                // platform-selector row (YouTube/Facebook/Instagram circular
-                // icons) has been removed entirely. selectedPlatforms is
-                // hard-coded to {'youtube'} above, so every upload always
-                // targets YouTube automatically with no user action needed.
-                // _platformCard()/_togglePlatform() helper methods were
-                // removed along with it — nothing else in this file depended
-                // on them being visible.
+                // The "Publish To" platform selector was removed: only YouTube is launched, so
+                // selectedPlatforms is always {'youtube'}.
 
                 // ---------------- Media type (Reel / Normal Video / Shorts) ----------------
-                // Auto-detected from the picker (single video -> this
-                // dropdown decides Reel vs Normal vs Shorts); applies to
-                // the whole batch, mirrored across Facebook + Instagram.
                 if (videos.isNotEmpty && (selectedPlatforms.contains('facebook') || selectedPlatforms.contains('instagram')))
                   _sectionCard(title: context.tr('up_media_type_title'), titleLeading: const Icon(Icons.video_settings_rounded, size: 18), children: [
                     _pickerField(
@@ -954,9 +928,6 @@ class _UploadScreenState extends State<UploadScreen> {
                   ]),
 
                 // ---------------- Schedule toggle (single, shared, bottom-most) ----------------
-                // Appears only after title/description/etc. are filled in above —
-                // this is the last thing before publishing, and there is only one
-                // schedule for the entire batch across every platform.
                 if (videos.isNotEmpty && selectedPlatforms.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -967,10 +938,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       children: [
                         Text(context.tr('up_publish_timing_title'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                         const SizedBox(height: 10),
-                        // Live / Schedule tab control — Schedule is the
-                        // default. Live bypasses the 1-hour minimum buffer
-                        // entirely (no date/time is even asked for), while
-                        // Schedule enforces it via _pickDateTime below.
+                        // Live / Schedule tab control — Schedule is the default.
                         Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(999)),

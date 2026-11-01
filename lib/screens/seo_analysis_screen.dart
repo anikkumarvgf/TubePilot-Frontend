@@ -7,6 +7,8 @@ import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/thumb_metrics.dart';
 import '../widgets/app_brand_background.dart';
+// ₹1 offer popup (shows again only when the user tries an AI action with 0 diamonds)
+import '../widgets/subscription_offer.dart';
 import 'diamond_store_screen.dart';
 import 'seo_complete_screen.dart';
 
@@ -204,7 +206,7 @@ class _Chk {
 ///  * basic   -> AI scores, issues, title/description suggestions. Recommended
 ///               tags + notes + competitor gap stay blurred (need Rs.100+ pack).
 ///  * advance -> everything.
-/// Suggestion cost (routes/ai.js): title 3 diamonds, description 3 diamonds.
+/// Suggestion cost (routes/ai.js): every AI action = 1 diamond (AI_DIAMOND_COST on the server).
 /// Suggestions are cached per video, so re-opening never charges again.
 class SeoAnalysisScreen extends StatefulWidget {
   final Map<String, dynamic> video;
@@ -260,6 +262,17 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     } catch (_) {}
   }
 
+  // ⚠️ NEW: AI action failed because the user has 0 diamonds -> offer the ₹1 plan
+  // (at most once per 24h, only if eligible). Otherwise the normal error toast is shown.
+  Future<void> _handleAiError(Object e) async {
+    if (!mounted) return;
+    if (e is ApiException && e.code == 'INSUFFICIENT_DIAMONDS') {
+      final started = await showSubscriptionOfferIfNeeded(context);
+      if (started) return;
+    }
+    if (mounted) showAiError(context, e);
+  }
+
   String _topic() {
     final d = _desc.trim();
     return d.isEmpty ? _title : '$_title - ${d.length > 200 ? d.substring(0, 200) : d}';
@@ -277,7 +290,6 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
     }).where((s) => s.trim().isNotEmpty).toList();
   }
 
-  // ✅ FIXED: `return _goUpgrade();` -> block + plain return (void fn can't return a value)
   Future<void> _generateTitles() async {
     if (_free) {
       _goUpgrade();
@@ -297,13 +309,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
         });
       }
     } catch (e) {
-      if (mounted) showAiError(context, e);
+      await _handleAiError(e);
     } finally {
       if (mounted) setState(() => _genTitles = false);
     }
   }
 
-  // ✅ FIXED
   Future<void> _generateDescs() async {
     if (_free) {
       _goUpgrade();
@@ -322,13 +333,12 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
         });
       }
     } catch (e) {
-      if (mounted) showAiError(context, e);
+      await _handleAiError(e);
     } finally {
       if (mounted) setState(() => _genDescs = false);
     }
   }
 
-  // ✅ FIXED
   void _improveWithAi() {
     if (_free) {
       _goUpgrade();
@@ -674,7 +684,9 @@ class _SeoAnalysisScreenState extends State<SeoAnalysisScreen> {
                   Text(seoTx(context, 'so_ai_suggestions', 'AI Suggestions'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                   const SizedBox(height: 3),
                   Text(
-                    seoTx(context, 'so_ai_cost_note', 'Better title and description ideas by AI (3 diamonds each).'),
+                    // Cost is now 1 diamond per AI action. (If your language files still hold the old
+                    // "3 diamonds each" text under so_ai_cost_note, change it there too.)
+                    seoTx(context, 'so_ai_cost_note', 'Better title and description ideas by AI (1 diamond each).'),
                     style: TextStyle(fontSize: 12, height: 1.4, color: context.surfaces.textDim),
                   ),
                 ]),

@@ -39,11 +39,20 @@ class PayuCheckout implements PayUCheckoutProProtocol {
     return _run(() => ApiService.instance.createLivePlanOrder(category: category, planName: planName));
   }
 
+  /// Rs1 now + Rs10/month autopay (PayU Standing Instruction).
+  Future<PayuResult> paySubscription() {
+    _verify = (t) => ApiService.instance.verifySubscriptionPayment(t);
+    _pendingMsg = 'Payment is still being confirmed. Your subscription will start automatically once it succeeds.';
+    return _run(() => ApiService.instance.startSubscription());
+  }
+
   Future<PayuResult> _run(Future<Map<String, dynamic>> Function() createOrder) async {
     Map<String, dynamic> p;
+    Map<String, dynamic>? si;
     try {
       final res = await createOrder();
       p = Map<String, dynamic>.from(res['payu'] as Map);
+      if (res['si'] is Map) si = Map<String, dynamic>.from(res['si'] as Map);
       _txnid = p['txnid'].toString();
     } catch (e) {
       debugPrint('[PayU] create-order failed: $e');
@@ -67,6 +76,21 @@ class PayuCheckout implements PayUCheckoutProProtocol {
       PayUPaymentParamKey.ios_surl: p['surl'],
       PayUPaymentParamKey.ios_furl: p['furl'],
     };
+    // Autopay details (subscription only). Server decides every value.
+    if (si != null) {
+      params[PayUPaymentParamKey.payUSIParams] = {
+        PayUSIParamsKeys.isFreeTrial: si['isFreeTrial'] == true,
+        PayUSIParamsKeys.billingAmount: si['billingAmount'].toString(),
+        PayUSIParamsKeys.billingInterval: si['billingInterval'].toString(),
+        PayUSIParamsKeys.paymentStartDate: si['paymentStartDate'].toString(),
+        PayUSIParamsKeys.paymentEndDate: si['paymentEndDate'].toString(),
+        PayUSIParamsKeys.billingCycle: si['billingCycle'].toString(),
+        PayUSIParamsKeys.remarks: si['remarks'].toString(),
+        PayUSIParamsKeys.billingCurrency: si['billingCurrency'].toString(),
+        PayUSIParamsKeys.billingLimit: si['billingLimit'].toString(),
+        PayUSIParamsKeys.billingRule: si['billingRule'].toString(),
+      };
+    }
     final config = {
       PayUCheckoutProConfigKeys.merchantName: 'TubePilot',
       PayUCheckoutProConfigKeys.showExitConfirmationOnCheckoutScreen: true,

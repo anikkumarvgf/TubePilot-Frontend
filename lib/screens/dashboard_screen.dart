@@ -17,6 +17,8 @@ import '../widgets/app_nav.dart';
 import '../widgets/diwali_popups.dart';
 // Milestone achievement popup (subscribers / views card)
 import '../widgets/milestone_popup.dart';
+// Rs1 offer popup helper (once after welcome, again only when the user tries to upload/generate)
+import '../widgets/subscription_offer.dart';
 import 'upload_screen.dart';
 import 'upcoming_screen.dart';
 import 'analytics_screen.dart';
@@ -29,6 +31,7 @@ import 'rate_us_screen.dart';
 import 'ai_ideas_screen.dart';
 import 'ai_title_description_screen.dart';
 import 'channel_audit_screen.dart';
+import 'competitor_radar_screen.dart';
 // Quick Actions has a "Live Stream" button.
 import 'live_stream_screen.dart';
 
@@ -148,7 +151,15 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
 
       // Diwali welcome popup — only the first time. If shown, skip the rest this time.
       final shownWelcome = await maybeShowDiwaliWelcome(context);
-      if (!mounted || shownWelcome) return;
+      if (!mounted) return;
+      if (shownWelcome) {
+        // ₹1 offer: shown ONCE, right after the welcome popup (first login). If the user skips it
+        // they just see the home page; the offer only comes back when they try to upload / generate
+        // (see showSubscriptionOfferIfNeeded in widgets/subscription_offer.dart).
+        final startedOffer = await showSubscriptionOfferIfNeeded(context, onlyOnce: true);
+        if (mounted && startedOffer) _load(showLoader: false);
+        return;
+      }
 
       // Milestone popup has priority. If a milestone card was shown, skip
       // Rate Us and the AI Idea popup this time — no dialog on top of another.
@@ -159,7 +170,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       await maybeShowRateUsPopup(context);
       if (!mounted) return;
       await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) await _maybeShowIdeaPopup();
+      if (!mounted) return;
+      await _maybeShowIdeaPopup();
     });
   }
 
@@ -199,25 +211,36 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     }
   }
 
-  Future<void> _maybeShowIdeaPopup() async {
+  Future<bool> _maybeShowIdeaPopup() async {
     // No channel connected -> no ideas. (Also do NOT start the 24h timer.)
-    if (youtubeChannel == null) return;
+    if (youtubeChannel == null) return false;
 
     final prefs = await SharedPreferences.getInstance();
     final lastShown = prefs.getInt(kIdeasPopupLastShownKey);
     final now = DateTime.now().millisecondsSinceEpoch;
     if (lastShown != null && now - lastShown < const Duration(hours: 24).inMilliseconds) {
-      return;
+      return false;
     }
-    if (!mounted) return;
+    if (!mounted) return false;
 
     // Niche comes from the connected channel (its category, else its name).
     final category = (youtubeChannel?['category'] ?? '').toString().trim();
     final title = (youtubeChannel?['channelTitle'] ?? '').toString().trim();
     final niche = category.isNotEmpty ? category : title;
 
-    await showIdeaPopup(context, channelNiche: niche.isNotEmpty ? niche : null);
+    // Save the time BEFORE showing: if the app is closed while the popup is open,
+    // it must still count as "shown today" (it used to appear on every app open).
     await prefs.setInt(kIdeasPopupLastShownKey, now);
+    final shown = await showIdeaPopup(context, channelNiche: niche.isNotEmpty ? niche : null);
+    if (!shown) {
+      // nothing was shown (no ideas / error) -> don't burn the 24h window
+      if (lastShown != null) {
+        await prefs.setInt(kIdeasPopupLastShownKey, lastShown);
+      } else {
+        await prefs.remove(kIdeasPopupLastShownKey);
+      }
+    }
+    return shown;
   }
 
   Future<void> _load({bool showLoader = true}) async {
@@ -403,11 +426,14 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                       ],
                     ),
                   ),
-                  const Text(
-                    'Your YouTube Growth Partner',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 10, fontWeight: FontWeight.w500),
+                  const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Your YouTube Growth Partner',
+                      maxLines: 1,
+                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 10.5, fontWeight: FontWeight.w500),
+                    ),
                   ),
                 ],
               ),
@@ -508,144 +534,88 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                   ),
                   const SizedBox(height: 18),
 
-                  // ---- Stat cards (2 x 2). Rows size themselves to their content,
-                  // so there is no fixed aspect ratio that can overflow. ----
+                  // ---- Compact stat cards (icon left, text right) ----
                   _cardRow([
-                    _MetricCard(
-                      icon: Icons.cloud_upload_rounded,
-                      label: context.tr('stat_free_uploads_left'),
-                      value: '${data?['remainingFreeUploads'] ?? 0}',
-                      subtitle: context.tr('resets_30_days'),
-                    ),
-                    _MetricCard(
-                      icon: Icons.diamond_outlined,
-                      label: context.tr('stat_diamond_balance'),
-                      value: '$diamondBalance',
-                      subtitle: worthUploads > 0 ? context.tr('diamonds_worth_uploads').replaceAll('%d', '$worthUploads') : null,
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen())).then((_) => _load(showLoader: false)),
-                    ),
-                  ]),
-                  const SizedBox(height: _kRowGap),
-                  _cardRow([
-                    _MetricCard(
+                    _CompactStat(
                       icon: Icons.play_circle_fill_rounded,
                       label: context.tr('stat_videos_published'),
                       value: '${data?['totalUploadedVideos'] ?? 0}',
                       subtitle: context.tr('total_videos'),
                     ),
-                    _MetricCard(
+                    _CompactStat(
                       icon: Icons.event_available_rounded,
                       label: context.tr('scheduled_videos'),
                       value: '${upcomingEvents.length}',
                       subtitle: context.tr('this_month'),
                     ),
                   ]),
-                  const SizedBox(height: _kRowGap),
+                  const SizedBox(height: 22),
 
-                  // ---- AI Ideas + Free uploads strip ----
-                  IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 11,
-                          child: DiwaliCard(
-                            padding: const EdgeInsets.all(12),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
-                            child: Row(
-                              children: [
-                                const _IconCircle(icon: Icons.bolt_rounded, size: 42, iconSize: 24),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        context.tr('qa_ai_ideas'),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 16, fontWeight: FontWeight.w800),
-                                      ),
-                                      const Text(
-                                        'Get video ideas tailored to your niche',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(color: DiwaliColors.textDim, fontSize: 10.5, height: 1.2),
-                                      ),
-                                    ],
-                                  ),
+                  // ---- YOUR BENEFITS (free uploads + diamonds, real values) ----
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 9),
+                        padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
+                        decoration: BoxDecoration(
+                          color: DiwaliColors.creamTop.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: DiwaliColors.gold.withValues(alpha: 0.8), width: 1.3),
+                        ),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _BenefitCell(
+                                  icon: Icons.cloud_upload_rounded,
+                                  label: 'Free Uploads',
+                                  value: '${free.remaining} / ${free.total}',
+                                  onTap: () => Navigator.of(context)
+                                      .push(MaterialPageRoute(builder: (_) => const UploadScreen()))
+                                      .then((_) => _load(showLoader: false)),
                                 ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.purpleDeep),
-                                  child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 18),
+                              ),
+                              VerticalDivider(width: 12, thickness: 1, color: DiwaliColors.gold.withValues(alpha: 0.6)),
+                              Expanded(
+                                child: _BenefitCell(
+                                  icon: Icons.diamond_outlined,
+                                  label: 'Diamonds',
+                                  value: _fmtThousands(diamondBalance.toInt()),
+                                  onTap: () => Navigator.of(context)
+                                      .push(MaterialPageRoute(builder: (_) => const WalletScreen()))
+                                      .then((_) => _load(showLoader: false)),
                                 ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            color: DiwaliColors.creamTop,
+                            child: const Text(
+                              'YOUR BENEFITS',
+                              style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 11, letterSpacing: 1.6, fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          flex: 8,
-                          child: DiwaliCard(
-                            padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
-                            child: Row(
-                              children: [
-                                const _IconCircle(icon: Icons.diamond_rounded, size: 34, iconSize: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        context.tr('stat_free_uploads_left'),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 10.5, height: 1.15, fontWeight: FontWeight.w500),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(
-                                          '${free.remaining} / ${free.total}',
-                                          style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 18, fontWeight: FontWeight.w800),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: free.total > 0 ? (free.remaining / free.total).clamp(0.0, 1.0) : 0,
-                                          minHeight: 4,
-                                          backgroundColor: DiwaliColors.iconCircle,
-                                          valueColor: const AlwaysStoppedAnimation(DiwaliColors.gold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded, color: DiwaliColors.purpleDark, size: 20),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
 
                   // ---- Quick Actions ----
                   Text(
                     context.tr('quick_actions'),
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, letterSpacing: -0.3),
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, letterSpacing: -0.3),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -658,7 +628,6 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // "Live Stream" (Analytics opens from the bottom bar tab).
                         Expanded(
                           child: _quickAction(
                             icon: Icons.podcasts_rounded,
@@ -686,7 +655,6 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Premium tile -> Buy Diamonds screen.
                         Expanded(
                           child: _quickAction(
                             icon: Icons.workspace_premium_rounded,
@@ -699,9 +667,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                       ],
                     ),
                   ),
-                  const SizedBox(height: _kRowGap),
+                  const SizedBox(height: 12),
 
-                  // ---- Channel Audit + Competitor Radar ----
+                  // ---- Channel Audit + Competitor Analysis (compact) ----
                   IntrinsicHeight(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -710,19 +678,17 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           child: _featureCard(
                             icon: Icons.workspace_premium_rounded,
                             title: context.tr('qa_channel_audit'),
-                            subtitle: 'Get detailed insights & improve your channel',
+                            subtitle: 'Get detailed insights & improve.',
                             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen())),
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Competitor Radar — route not known yet, so "coming soon" toast.
-                        // Put your screen's route here when it exists.
                         Expanded(
                           child: _featureCard(
                             icon: Icons.emoji_events_rounded,
-                            title: 'Competitor Radar',
-                            subtitle: 'See what your competitors do',
-                            onTap: () => showToast(context, 'Competitor Radar coming soon', isSuccess: true),
+                            title: 'Competitor Analysis',
+                            subtitle: 'See what your competitors do.',
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen())),
                           ),
                         ),
                       ],
@@ -853,14 +819,14 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _IconCircle(icon: icon, size: 42, iconSize: 23),
-          const SizedBox(height: 6),
+          _IconCircle(icon: icon, size: 40, iconSize: 22),
+          const SizedBox(height: 5),
           Text(
             label,
             textAlign: TextAlign.center,
             maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500, color: DiwaliColors.purpleDark, height: 1.15),
+            softWrap: true,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: DiwaliColors.purpleDark, height: 1.15),
           ),
         ],
       ),
@@ -869,33 +835,36 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
 
   Widget _featureCard({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
     return DiwaliCard(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
       onTap: onTap,
       child: Row(
         children: [
-          _IconCircle(icon: icon, size: 40, iconSize: 22),
-          const SizedBox(width: 9),
+          _IconCircle(icon: icon, size: 38, iconSize: 21),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w800),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w800),
+                  ),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   subtitle,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: DiwaliColors.textDim, fontSize: 10, height: 1.2),
                 ),
               ],
             ),
           ),
+          const Icon(Icons.chevron_right_rounded, color: DiwaliColors.purpleDark, size: 20),
         ],
       ),
     );
@@ -1106,10 +1075,10 @@ class _MetricCard extends StatelessWidget {
 // AI Idea popup
 // =============================================================================
 
-Future<void> showIdeaPopup(BuildContext context, {String? channelNiche}) async {
+Future<bool> showIdeaPopup(BuildContext context, {String? channelNiche}) async {
   // No niche = no connected channel -> never show generic 'Tech' ideas,
   // no matter which screen calls this.
-  if (channelNiche == null || channelNiche.trim().isEmpty) return;
+  if (channelNiche == null || channelNiche.trim().isEmpty) return false;
 
   List<Map<String, dynamic>> ideas = [];
   try {
@@ -1122,13 +1091,14 @@ Future<void> showIdeaPopup(BuildContext context, {String? channelNiche}) async {
   } catch (_) {
     // Silent failure — soft nudge popup, not a core flow.
   }
-  if (ideas.isEmpty || !context.mounted) return;
+  if (ideas.isEmpty || !context.mounted) return false;
 
   await showDialog(
     context: context,
     barrierDismissible: false,
     builder: (_) => _IdeaPopupDialog(ideas: ideas.take(3).toList()),
   );
+  return true;
 }
 
 class _FlyingEmoji {
@@ -1396,6 +1366,102 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
               ],
             ),
             ..._flyingEmojis.map(_buildFlyingEmoji),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+String _fmtThousands(int n) {
+  final s = n.abs().toString();
+  final b = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
+  }
+  return n < 0 ? '-$b' : b.toString();
+}
+
+/// Small stat card: icon circle on the left, label / value / caption on the right.
+class _CompactStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String subtitle;
+  const _CompactStat({required this.icon, required this.label, required this.value, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return DiwaliCard(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          _IconCircle(icon: icon, size: 44, iconSize: 24),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(label, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                ),
+                Text(value, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 21, fontWeight: FontWeight.w800, height: 1.15)),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(subtitle, maxLines: 1, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One half of the YOUR BENEFITS strip.
+class _BenefitCell extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback? onTap;
+  const _BenefitCell({required this.icon, required this.label, required this.value, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+        child: Row(
+          children: [
+            _IconCircle(icon: icon, size: 44, iconSize: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(label, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                  ),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 20, fontWeight: FontWeight.w800)),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

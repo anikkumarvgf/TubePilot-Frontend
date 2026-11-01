@@ -9,7 +9,9 @@ import '../providers/language_provider.dart';
 import 'live_plans_screen.dart';
 
 class DiamondStoreScreen extends StatefulWidget {
-  const DiamondStoreScreen({super.key});
+  /// true when opened from the dashboard's "Pay ₹1 & start" popup: the checkout opens right away.
+  final bool autoStartSubscription;
+  const DiamondStoreScreen({super.key, this.autoStartSubscription = false});
   @override
   State<DiamondStoreScreen> createState() => _DiamondStoreScreenState();
 }
@@ -21,6 +23,10 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   int balance = 0;
   bool loading = true;
   int? _payingDiamonds;
+
+  // Subscription (₹1 intro, then ₹10/month autopay) - real status from the backend.
+  Map<String, dynamic>? _subStatus;
+  bool _subBusy = false;
 
   final PayuCheckout _payu = PayuCheckout();
 
@@ -35,12 +41,161 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      if (!mounted || !widget.autoStartSubscription) return;
+      if (_subStatus?['eligible'] == true) _subscribe();
+    });
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final r = await ApiService.instance.getSubscriptionStatus();
+      if (mounted) setState(() => _subStatus = r);
+    } catch (e) {
+      debugPrint('[Subscription] status load failed: $e');
+    }
+  }
+
+  Future<void> _subscribe() async {
+    if (_subBusy || _payingDiamonds != null) return;
+    setState(() => _subBusy = true);
+    try {
+      final r = await _payu.paySubscription();
+      if (!mounted) return;
+      if (r.approved) {
+        showToast(context, 'Subscription started ✅', isSuccess: true);
+      } else if (r.status == 'pending') {
+        showToast(context, r.message, isError: false);
+      } else if (r.status != 'cancelled') {
+        showToast(context, r.message, isError: true);
+      }
+      await _loadSubscription();
+      _load();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _subBusy = false);
+    }
+  }
+
+  Future<void> _cancelSubscription() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel autopay?'),
+        content: const Text('You will not be charged again. Your benefits stay until the period you already paid for ends.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel autopay', style: TextStyle(color: AppColors.red))),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _subBusy = true);
+    try {
+      final r = await ApiService.instance.cancelSubscription();
+      if (mounted) showToast(context, (r['message'] ?? 'Subscription cancelled').toString(), isSuccess: true);
+      await _loadSubscription();
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    } finally {
+      if (mounted) setState(() => _subBusy = false);
+    }
+  }
+
+  Widget _subscriptionCard() {
+    final st = _subStatus;
+    if (st == null) return const SizedBox.shrink();
+    final offer = st['offer'] is Map ? Map<String, dynamic>.from(st['offer']) : <String, dynamic>{};
+    final sub = st['subscription'] is Map ? Map<String, dynamic>.from(st['subscription']) : null;
+    final plan = offer['planAmount'] ?? 10;
+    final intro = offer['introAmount'] ?? 1;
+    final diamonds = offer['diamonds'] ?? 0;
+    final introUploads = offer['introUploads'] ?? 20;
+    final planUploads = offer['planUploads'] ?? 30;
+    final credits = st['credits'] ?? 0;
+    final status = (sub?['status'] ?? '').toString();
+
+    Widget shell({required Color border, required List<Widget> children}) => Container(
+          margin: const EdgeInsets.only(top: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border, width: 1.4),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+        );
+
+    if (status == 'active') {
+      final next = sub?['nextDebitAt'];
+      return shell(border: AppColors.green, children: [
+        Row(children: [
+          const Icon(Icons.verified_rounded, color: AppColors.green),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Subscription active', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+        ]),
+        const SizedBox(height: 6),
+        Text(
+          next != null
+              ? 'Your uploads are over · ₹$plan will be auto-debited on ${formatDate(next.toString())} ($planUploads uploads + $diamonds diamonds)'
+              : '$credits uploads left · when they end, ₹$plan is auto-debited after a 24-hour notice',
+          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: _subBusy ? null : _cancelSubscription,
+            child: _subBusy
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Cancel autopay'),
+          ),
+        ),
+      ]);
+    }
+
+    if (status == 'cancelled') {
+      final end = sub?['currentPeriodEnd'];
+      return shell(border: context.surfaces.border, children: [
+        const Text('Autopay cancelled', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        const SizedBox(height: 6),
+        Text(
+          end != null ? 'Benefits stay until ${formatDate(end.toString())}. You will not be charged again.' : 'You will not be charged again.',
+          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
+        ),
+      ]);
+    }
+
+    if (st['eligible'] == true) {
+      return shell(border: AppColors.purple, children: [
+        Text('$introUploads uploads for just ₹$intro', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        const SizedBox(height: 6),
+        Text(
+          'Pay ₹$intro now and get $introUploads uploads. '
+          'When they are used up, ₹$plan is auto-debited after a 24-hour notice and you get $planUploads uploads + $diamonds diamonds for 1 month. '
+          'Cancel anytime here.',
+          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: (_subBusy || _payingDiamonds != null) ? null : _subscribe,
+            child: _subBusy
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text('Pay ₹$intro & start'),
+          ),
+        ),
+      ]);
+    }
+    return const SizedBox.shrink();
   }
 
   Future<void> _load() async {
     setState(() => loading = true);
     try {
+      _loadSubscription();
       final pkgRes = await ApiService.instance.getDiamondPackages();
       debugPrint('[Diamond] packages loaded: ${pkgRes['packages']?.length}');
       setState(() {
@@ -141,6 +296,7 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                     padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
                     children: [
                       _topSwitcher(),
+                      _subscriptionCard(),
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(16),

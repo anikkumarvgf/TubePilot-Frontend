@@ -431,6 +431,17 @@ class ApiService {
         if (postSalt != null) 'postSalt': postSalt,
       });
 
+  // ---------------- Subscription (Rs1 intro, then Rs10/month autopay via PayU SI) ----------------
+  // ------ GET /api/subscription/status ------ //
+  Future<Map<String, dynamic>> getSubscriptionStatus() => _request('/subscription/status');
+  // ------ POST /api/subscription/start ------ //   -> { orderId, payu, si }
+  Future<Map<String, dynamic>> startSubscription() => _request('/subscription/start', method: 'POST');
+  // ------ POST /api/subscription/verify ------ //
+  Future<Map<String, dynamic>> verifySubscriptionPayment(String orderId) =>
+      _request('/subscription/verify', method: 'POST', body: {'orderId': orderId});
+  // ------ POST /api/subscription/cancel ------ //
+  Future<Map<String, dynamic>> cancelSubscription() => _request('/subscription/cancel', method: 'POST');
+
   // ------ GET /api/diamonds/my-requests ------ //
   Future<Map<String, dynamic>> myPurchaseRequests() => _request('/diamonds/my-requests');
 

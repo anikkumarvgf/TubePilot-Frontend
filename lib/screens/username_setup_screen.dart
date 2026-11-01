@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/custom_dropdown.dart';
 import '../widgets/app_brand_background.dart';
+import '../widgets/diwali_decor.dart';
+import '../widgets/diwali_popups.dart';
 import 'dashboard_screen.dart';
 
 class UsernameSetupScreen extends StatefulWidget {
@@ -115,8 +117,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     }
   }
 
-  // ⚠️ FIX (Boss request): the dialog used to close on EVERY tap of Apply —
-  // even with an empty box or a wrong code. Now:
+  // Referral dialog (Diwali style).
   //   * empty box      -> stays open, shows "enter a code or tap Skip"
   //   * wrong/invalid  -> stays open, shows the backend's message under the box
   //   * valid code     -> success toast, then closes
@@ -130,13 +131,13 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     await showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.black54,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(context.tr('referral_dialog_title')),
+        builder: (dialogContext, setDialogState) => DiwaliDialog(
+          icon: Icons.card_giftcard_rounded,
+          title: context.tr('referral_dialog_title'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(context.tr('referral_dialog_body')),
               const SizedBox(height: 14),
@@ -144,6 +145,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                 controller: referralCtrl,
                 enabled: !submitting,
                 textCapitalization: TextCapitalization.characters,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: DiwaliColors.inkBlack, fontWeight: FontWeight.w700, letterSpacing: 1),
                 onChanged: (_) {
                   if (errorText != null) setDialogState(() => errorText = null);
                 },
@@ -151,16 +154,43 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   hintText: 'e.g. 102458XK9F2',
                   errorText: errorText,
                   errorMaxLines: 3,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.7)),
+                  ),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: DiwaliColors.purple, width: 1.6),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Colors.redAccent),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
+                  ),
                 ),
               ),
             ],
           ),
           actions: [
-            TextButton(
+            DiwaliDialogButton(
+              label: context.tr('skip'),
+              primary: false,
               onPressed: submitting ? null : () => Navigator.pop(dialogContext),
-              child: Text(context.tr('skip')),
             ),
-            ElevatedButton(
+            const SizedBox(width: 10),
+            DiwaliDialogButton(
+              label: context.tr('apply'),
+              loading: submitting,
               onPressed: submitting
                   ? null
                   : () async {
@@ -200,9 +230,6 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                         }
                       }
                     },
-              child: submitting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(context.tr('apply')),
             ),
           ],
         ),
@@ -229,31 +256,30 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     );
   }
 
-  // ⚠️ NEW (Boss request — "welcome pop ke baad channel connect ka pop
-  // aaye aur bagal me skip ka option"): shown right after the referral
-  // dialog. "Connect" kicks off the same YouTube OAuth flow used
-  // elsewhere in the app (GET /youtube/oauth/url -> Custom Tabs, same as
-  // profile_screen.dart's _connectYoutube); "Skip" just closes it.
+  // "Connect Your Channel" popup (Diwali style). "Connect" starts the same
+  // YouTube OAuth flow used elsewhere in the app (GET /youtube/oauth/url ->
+  // Custom Tabs); "Skip" just closes it.
   Future<void> _showChannelConnectDialog() async {
     bool connecting = false;
     await showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.black54,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Row(children: [
-            const Icon(Icons.link_rounded, color: AppColors.purple, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(context.tr('channel_connect_dialog_title'))),
-          ]),
+        builder: (dialogContext, setDialogState) => DiwaliDialog(
+          icon: Icons.link_rounded,
+          title: context.tr('channel_connect_dialog_title'),
           content: Text(context.tr('channel_connect_dialog_body')),
           actions: [
-            TextButton(
+            DiwaliDialogButton(
+              label: context.tr('skip'),
+              primary: false,
               onPressed: connecting ? null : () => Navigator.pop(dialogContext),
-              child: Text(context.tr('skip')),
             ),
-            ElevatedButton(
+            const SizedBox(width: 10),
+            DiwaliDialogButton(
+              label: context.tr('connect_channel_btn'),
+              loading: connecting,
               onPressed: connecting
                   ? null
                   : () async {
@@ -270,9 +296,6 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
                       }
                     },
-              child: connecting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(context.tr('connect_channel_btn')),
             ),
           ],
         ),
@@ -281,28 +304,13 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   }
 
   Future<void> _showWelcomeFlow() async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Row(children: [
-          const Icon(Icons.celebration_rounded, color: AppColors.purple, size: 22),
-          const SizedBox(width: 8),
-          Expanded(child: Text(context.tr('welcome_title'))),
-        ]),
-        content: Text(context.tr('welcome_body')),
-        actions: [
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: Text(context.tr('lets_go'))),
-        ],
-      ),
-    );
-    if (!mounted) return;
-
+    // UPDATED: the plain "Welcome to Tube Pilot! (20 credits + 10 diamonds)"
+    // popup is REMOVED. The Diwali welcome card already appears on the
+    // dashboard for new accounts.
+    // Flow: Referral -> Channel Connect (+Skip) -> Dashboard.
     await _showReferralDialog();
     if (!mounted) return;
 
-    // Flow: Welcome -> Referral -> Channel Connect (+Skip) -> Dashboard.
     await _showChannelConnectDialog();
     if (!mounted) return;
 

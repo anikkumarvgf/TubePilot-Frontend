@@ -21,6 +21,9 @@ class DiwaliColors {
   static const mauve = Color(0xFF9B6F94);
   static const textDim = Color(0xFF7D6B78);
 
+  // Dark text used on the login screen bottom lines (very readable).
+  static const inkBlack = Color(0xFF1B0F20);
+
   // Light beige used behind every icon.
   static const iconCircle = Color(0xFFF5EAD3);
 
@@ -233,6 +236,8 @@ class DiwaliBottomNav extends StatelessWidget {
   static const double _artW = 1152;
   static const double _artH = 186;
   static const _centers = <double>[210, 383, 575, 758, 940];
+  // Slight zoom (taller bar, bigger icons + labels) so it is easy to read/tap.
+  static const double _zoom = 1.22;
 
   @override
   Widget build(BuildContext context) {
@@ -246,9 +251,9 @@ class DiwaliBottomNav extends StatelessWidget {
         builder: (context, c) {
           final w = c.maxWidth;
           final s = w / _artW; // artwork px -> dp
-          final h = _artH * s;
+          final h = _artH * s * _zoom;
           final tabW = 150 * s;
-          final top = 36 * s;
+          final top = 36 * s * _zoom;
 
           return SizedBox(
             width: w,
@@ -278,7 +283,7 @@ class DiwaliBottomNav extends StatelessWidget {
                         children: [
                           Icon(
                             i == currentIndex ? _filled[i] : _outlined[i],
-                            size: 80 * s,
+                            size: 100 * s,
                             color: DiwaliColors.purpleDeep,
                           ),
                           const SizedBox(height: 1),
@@ -288,7 +293,7 @@ class DiwaliBottomNav extends StatelessWidget {
                               i < labels.length ? labels[i] : '',
                               maxLines: 1,
                               style: TextStyle(
-                                fontSize: (34 * s).clamp(10.0, 12.5),
+                                fontSize: (42 * s).clamp(11.5, 14.5),
                                 height: 1.1,
                                 fontWeight: i == currentIndex ? FontWeight.w700 : FontWeight.w500,
                                 color: DiwaliColors.purpleDeep,
@@ -298,8 +303,8 @@ class DiwaliBottomNav extends StatelessWidget {
                           const SizedBox(height: 2),
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            width: i == currentIndex ? 46 * s : 0,
-                            height: (8 * s).clamp(2.5, 4.0),
+                            width: i == currentIndex ? 56 * s : 0,
+                            height: (9 * s).clamp(3.0, 4.5),
                             decoration: BoxDecoration(
                               color: DiwaliColors.purpleDeep,
                               borderRadius: BorderRadius.circular(2),
@@ -644,7 +649,7 @@ class DiwaliAuthBackground extends StatelessWidget {
             ),
           ),
         ),
-        const IgnorePointer(child: CustomPaint(painter: _AuthBgPainter())),
+        IgnorePointer(child: CustomPaint(painter: _AuthBgPainter(splash: art == DiwaliArt.splash))),
         Positioned(top: 0, left: 0, child: IgnorePointer(child: DiwaliGarlands(scale: s))),
         Positioned(
           top: 0,
@@ -652,26 +657,19 @@ class DiwaliAuthBackground extends StatelessWidget {
           child: IgnorePointer(child: Transform.flip(flipX: true, child: DiwaliGarlands(scale: s))),
         ),
         if (art == DiwaliArt.auth) ...[
-          Positioned(left: -8, bottom: 4, child: IgnorePointer(child: DiwaliBigDiya(width: 210 * s))),
+          // UPDATED: bottom art is smaller and sits lower, so it no longer
+          // covers the "Already have an account?" / Terms lines.
+          Positioned(left: -10, bottom: -6, child: IgnorePointer(child: DiwaliBigDiya(width: 140 * s))),
           Positioned(
-            right: 12,
-            bottom: 18,
+            right: 10,
+            bottom: 6,
             child: IgnorePointer(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                children: [DiwaliDiya(width: 34 * s), SizedBox(width: 6 * s), DiwaliDiya(width: 44 * s)],
+                children: [DiwaliDiya(width: 26 * s), SizedBox(width: 4 * s), DiwaliDiya(width: 34 * s)],
               ),
             ),
           ),
-        ] else ...[
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 64 * s,
-            child: IgnorePointer(child: Center(child: DiwaliBigDiya(width: 310 * s))),
-          ),
-          Positioned(left: 14, bottom: 120 * s, child: IgnorePointer(child: DiwaliDiya(width: 46 * s))),
-          Positioned(right: 14, bottom: 120 * s, child: IgnorePointer(child: DiwaliDiya(width: 46 * s))),
         ],
         child,
       ],
@@ -814,95 +812,126 @@ class DiwaliLotusDivider extends StatelessWidget {
 
 /// Complete splash screen visuals. In SplashScreen keep your existing
 /// timer / navigation and just `return const DiwaliSplashView();` from build().
+///
+/// UPDATED layout (fixes the spinner touching the rangoli):
+///   * logo + greeting moved up a little
+///   * big diya / rangoli made a bit smaller and lifted
+///   * loader sits clearly BELOW the rangoli with a visible gap
 class DiwaliSplashView extends StatelessWidget {
   const DiwaliSplashView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final s = (width / 390).clamp(0.8, 1.15).toDouble();
-
-    final top = SizedBox(
-      width: 340,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/splash.png',
-            width: 118,
-            height: 118,
-            errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_outline_rounded, size: 100, color: DiwaliColors.purple),
-          ),
-          const SizedBox(height: 6),
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 46, fontWeight: FontWeight.w800, letterSpacing: -1.2),
-              children: [
-                TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF1B0F20))),
-                TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
-              ],
-            ),
-          ),
-          const Text('Your YouTube Growth Partner', style: TextStyle(color: DiwaliColors.textDim, fontSize: 15)),
-          const SizedBox(height: 30),
-          const Text(
-            'H A P P Y',
-            style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 15, letterSpacing: 4, fontWeight: FontWeight.w500),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const DiwaliSprig(width: 24, height: 30, mirrored: true),
-              const SizedBox(width: 8),
-              ShaderMask(
-                shaderCallback: (r) => const LinearGradient(colors: [DiwaliColors.purpleDark, DiwaliColors.purple]).createShader(r),
-                child: Text(
-                  'Diwali',
-                  style: DiwaliColors.script.copyWith(color: Colors.white, fontSize: 72, fontWeight: FontWeight.w600, height: 1.05),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const DiwaliSprig(width: 24, height: 30),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'May your content shine brighter\nand your dreams grow bigger.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 17, height: 1.35),
-          ),
-          const SizedBox(height: 14),
-          const DiwaliLotusDivider(),
-        ],
-      ),
-    );
-
     return Material(
       color: Colors.transparent,
       child: DiwaliAuthBackground(
         art: DiwaliArt.splash,
-        child: SafeArea(
-          child: Column(
+        child: LayoutBuilder(builder: (context, c) {
+          final w = c.maxWidth;
+          final h = c.maxHeight;
+          final logo = (h * 0.14).clamp(80.0, 140.0).toDouble();
+          final diyaW = (w * 0.66).clamp(200.0, 320.0).toDouble();
+
+          return Stack(
             children: [
-              SizedBox(height: 70 * s),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: FittedBox(fit: BoxFit.scaleDown, child: top),
+              // ---- logo + name + tagline ----
+              Positioned(
+                top: h * 0.15,
+                left: 0,
+                right: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/splash.png',
+                      width: logo,
+                      height: logo,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Icon(Icons.play_circle_outline_rounded, size: logo * 0.8, color: DiwaliColors.purple),
+                    ),
+                    const SizedBox(height: 8),
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, letterSpacing: -1.2),
+                        children: [
+                          TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF14091A))),
+                          TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
+                        ],
+                      ),
+                    ),
+                    const Text('Your YouTube Growth Partner', style: TextStyle(color: DiwaliColors.textDim, fontSize: 15)),
+                  ],
                 ),
               ),
-              SizedBox(height: 250 * s),
-              const SizedBox(
-                width: 34,
-                height: 34,
-                child: CircularProgressIndicator(strokeWidth: 3, color: DiwaliColors.purple),
+              // ---- greeting ----
+              Positioned(
+                top: h * 0.425,
+                left: 0,
+                right: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'H A P P Y',
+                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 14, letterSpacing: 3, fontWeight: FontWeight.w500),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const DiwaliSprig(width: 26, height: 32, mirrored: true),
+                        const SizedBox(width: 12),
+                        ShaderMask(
+                          shaderCallback: (r) => const LinearGradient(colors: [DiwaliColors.purpleDark, DiwaliColors.purple]).createShader(r),
+                          child: Text(
+                            'Diwali',
+                            style: DiwaliColors.script.copyWith(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w600, height: 1.05),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const DiwaliSprig(width: 26, height: 32),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'May your content shine brighter\nand your dreams grow bigger.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 15.5, height: 1.35),
+                    ),
+                    const SizedBox(height: 8),
+                    const DiwaliLotusDivider(width: 200),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              const Text('Loading Your Creative Journey…', style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 14)),
-              const SizedBox(height: 22),
+              // ---- side diyas + big diya + rangoli + flowers ----
+              Positioned(left: 14, bottom: h * 0.19, child: IgnorePointer(child: DiwaliDiya(width: 40))),
+              Positioned(right: 14, bottom: h * 0.19, child: IgnorePointer(child: DiwaliDiya(width: 40))),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: h * 0.15,
+                child: IgnorePointer(child: Center(child: DiwaliBigDiya(width: diyaW))),
+              ),
+              // ---- loader: clearly BELOW the rangoli (visible gap) ----
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: h * 0.04,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 3, color: DiwaliColors.purple),
+                    ),
+                    SizedBox(height: 8),
+                    Text('Loading Your Creative Journey…', style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 13.5)),
+                  ],
+                ),
+              ),
             ],
-          ),
-        ),
+          );
+        }),
       ),
     );
   }
@@ -943,7 +972,8 @@ void _drawFirework(Canvas canvas, Offset c, double r) {
 }
 
 class _AuthBgPainter extends CustomPainter {
-  const _AuthBgPainter();
+  final bool splash;
+  const _AuthBgPainter({this.splash = false});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -967,8 +997,10 @@ class _AuthBgPainter extends CustomPainter {
       canvas.restore();
     }
 
-    _drawFirework(canvas, Offset(w * 0.22, h * 0.16), 34);
-    _drawFirework(canvas, Offset(w * 0.82, h * 0.30), 38);
+    if (!splash) {
+      _drawFirework(canvas, Offset(w * 0.22, h * 0.16), 34);
+      _drawFirework(canvas, Offset(w * 0.82, h * 0.30), 38);
+    }
 
     // plum corner swooshes (top + bottom), mirrored for the right side
     for (final mirror in [false, true]) {
@@ -977,12 +1009,12 @@ class _AuthBgPainter extends CustomPainter {
         canvas.translate(w, 0);
         canvas.scale(-1, 1);
       }
-      final top = Path()
+      final top = splash ? Path() : (Path()
         ..moveTo(0, 0)
         ..lineTo(w * 0.36, 0)
         ..quadraticBezierTo(w * 0.12, h * 0.025, 0, h * 0.085)
-        ..close();
-      canvas.drawPath(
+        ..close());
+      if (!splash) canvas.drawPath(
         top,
         Paint()
           ..shader = const LinearGradient(
@@ -991,7 +1023,7 @@ class _AuthBgPainter extends CustomPainter {
             colors: [DiwaliColors.purple, DiwaliColors.purpleDark],
           ).createShader(Rect.fromLTWH(0, 0, w * 0.36, h * 0.09)),
       );
-      canvas.drawPath(
+      if (!splash) canvas.drawPath(
         Path()
           ..moveTo(w * 0.36, 0)
           ..quadraticBezierTo(w * 0.13, h * 0.03, 0, h * 0.095),
