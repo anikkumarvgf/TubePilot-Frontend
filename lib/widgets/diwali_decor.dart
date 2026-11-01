@@ -38,29 +38,30 @@ class DiwaliColors {
 }
 
 // ---------------------------------------------------------------------------
-// Full-screen festival background.
+// Full-screen background. Wrap a transparent Scaffold with this.
 //
-// FIX: the artwork (9:16) used to be drawn with BoxFit.cover, which crops the
-// sides on taller phones and cut the hanging diyas. Now it is scaled to the
-// screen WIDTH (nothing is cropped sideways, no stretching): the top half is
-// pinned to the top and the bottom half to the bottom, the middle fades into
-// plain cream. Wrap a transparent Scaffold with this.
+// DEFAULT (festivalImage: false): our own painted cream (#FFF8E7) with very
+// faint gold rings — NO image file is used, so assets/diwali_bg.png is not
+// loaded here at all.
+// festivalImage: true brings the old diwali_bg.png artwork back.
 //
 // [decor] is kept only so old call sites still compile; it does nothing now.
 // ---------------------------------------------------------------------------
 class DiwaliBackground extends StatelessWidget {
   final Widget child;
   final bool decor;
-  const DiwaliBackground({super.key, required this.child, this.decor = true});
+  final bool festivalImage;
+  const DiwaliBackground({super.key, required this.child, this.decor = true, this.festivalImage = false});
 
   @override
   Widget build(BuildContext context) {
-    final asset = context.watch<ThemeProvider>().festivalBackgroundAsset;
+    final asset = festivalImage ? context.watch<ThemeProvider>().festivalBackgroundAsset : null;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: DiwaliColors.creamTop),
+        if (!festivalImage) const Positioned.fill(child: CustomPaint(painter: _CreamRingsPainter())),
         if (asset != null) ...[
           Positioned(top: 0, left: 0, right: 0, child: _BgHalf(asset: asset, top: true)),
           Positioned(bottom: 0, left: 0, right: 0, child: _BgHalf(asset: asset, top: false)),
@@ -69,6 +70,27 @@ class DiwaliBackground extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Very faint gold rings on the cream (same as the original painted design).
+class _CreamRingsPainter extends CustomPainter {
+  const _CreamRingsPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = DiwaliColors.gold.withValues(alpha: 0.10);
+    for (final c in [Offset(size.width * 0.05, size.height * 0.42), Offset(size.width * 0.98, size.height * 0.66)]) {
+      for (var r = 24.0; r <= 84; r += 20) {
+        canvas.drawCircle(c, r, ring);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// One half (top or bottom) of the background artwork, fitted to the width.
@@ -168,6 +190,131 @@ class DiwaliCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Bottom navigation bar — built from the reference artwork.
+//
+// assets/nav_bg.png (1152 x 186, transparent top) holds the cream bar, the
+// plum swooshes with the gold line, the diyas and the marigolds. It is scaled
+// to the SCREEN WIDTH, so the proportions are identical on every phone. Only
+// the 5 icons + labels + the active underline are real widgets drawn on top
+// (so taps, active state and languages keep working).
+//
+// Android 3-button / gesture bar: wrapped in SafeArea, so the bar always sits
+// ABOVE the system buttons. Use it as Scaffold.bottomNavigationBar with
+// extendBody: false.
+// ---------------------------------------------------------------------------
+class DiwaliBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final List<String> labels;
+
+  const DiwaliBottomNav({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+    this.labels = const ['Home', 'Upload', 'Videos', 'Analytics', 'Profile'],
+  });
+
+  static const _outlined = <IconData>[
+    Icons.home_outlined,
+    Icons.cloud_upload_outlined,
+    Icons.video_library_outlined,
+    Icons.insights_rounded,
+    Icons.person_outline_rounded,
+  ];
+  static const _filled = <IconData>[
+    Icons.home_rounded,
+    Icons.cloud_upload_rounded,
+    Icons.video_library_rounded,
+    Icons.insights_rounded,
+    Icons.person_rounded,
+  ];
+
+  // Artwork size and the x-centre of each tab inside it (artwork pixels).
+  static const double _artW = 1152;
+  static const double _artH = 186;
+  static const _centers = <double>[210, 383, 575, 758, 940];
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth;
+          final s = w / _artW; // artwork px -> dp
+          final h = _artH * s;
+          final tabW = 150 * s;
+          final top = 36 * s;
+
+          return SizedBox(
+            width: w,
+            height: h,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/nav_bg.png',
+                    fit: BoxFit.fill,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const ColoredBox(color: DiwaliColors.creamTop),
+                  ),
+                ),
+                for (var i = 0; i < 5; i++)
+                  Positioned(
+                    left: _centers[i] * s - tabW / 2,
+                    top: top,
+                    width: tabW,
+                    height: h - top,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTap(i),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Icon(
+                            i == currentIndex ? _filled[i] : _outlined[i],
+                            size: 80 * s,
+                            color: DiwaliColors.purpleDeep,
+                          ),
+                          const SizedBox(height: 1),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              i < labels.length ? labels[i] : '',
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: (34 * s).clamp(10.0, 12.5),
+                                height: 1.1,
+                                fontWeight: i == currentIndex ? FontWeight.w700 : FontWeight.w500,
+                                color: DiwaliColors.purpleDeep,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: i == currentIndex ? 46 * s : 0,
+                            height: (8 * s).clamp(2.5, 4.0),
+                            decoration: BoxDecoration(
+                              color: DiwaliColors.purpleDeep,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Small public pieces (still available for the popups / other screens)
 // ---------------------------------------------------------------------------
 class DiwaliDiya extends StatelessWidget {
@@ -224,6 +371,46 @@ class DiwaliCornerDecor extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Marigold flowers + petals shown beside the "Happy Diwali" badge.
+class DiwaliSideFlowers extends StatelessWidget {
+  const DiwaliSideFlowers({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(width: 46, height: 80, child: CustomPaint(painter: _SideFlowersPainter()));
+  }
+}
+
+class _SideFlowersPainter extends CustomPainter {
+  const _SideFlowersPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    _drawFlower(canvas, const Offset(38, 20), 13, const Color(0xFFF28C1B));
+    _drawFlower(canvas, const Offset(30, 46), 9, const Color(0xFFFFB81F));
+    _drawFlower(canvas, const Offset(42, 66), 10, const Color(0xFFE8731A));
+    final p = Paint()..color = DiwaliColors.petal.withValues(alpha: 0.75);
+    for (final s in const [
+      [20.0, 34.0, 0.6],
+      [26.0, 70.0, -0.5],
+    ]) {
+      canvas.save();
+      canvas.translate(s[0], s[1]);
+      canvas.rotate(s[2]);
+      canvas.drawPath(
+        Path()
+          ..quadraticBezierTo(6, -4, 12, 0)
+          ..quadraticBezierTo(6, 4, 0, 0),
+        p,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ---------------------------------------------------------------------------

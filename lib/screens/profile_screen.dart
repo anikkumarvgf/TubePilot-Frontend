@@ -9,6 +9,9 @@ import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
 import '../widgets/app_brand_background.dart';
+// ⚠️ NEW: Diwali cards + Diwali bottom sheets
+import '../widgets/diwali_decor.dart';
+import '../widgets/diwali_popups.dart';
 import 'wallet_screen.dart';
 import 'diamond_store_screen.dart';
 import 'gift_code_screen.dart';
@@ -28,7 +31,7 @@ import 'visual_analyzer_screen.dart';
 import 'channel_audit_screen.dart';
 import 'wallet_refund_logs_screen.dart';
 import 'my_videos_screen.dart';
-import 'live_stream_screen.dart'; // ⚠️ NEW — Live Streaming feature
+import 'live_stream_screen.dart'; // Live Streaming feature
 
 class ProfileScreen extends StatefulWidget {
   final bool embedded;
@@ -37,7 +40,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-// ⚠️ CHANGED: WidgetsBindingObserver added — this tab lives in an IndexedStack, so
+// WidgetsBindingObserver added — this tab lives in an IndexedStack, so
 // initState runs only once. We refresh when the app comes back from the browser
 // (YouTube / Facebook connect) so the connected channel shows up immediately.
 class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
@@ -45,7 +48,6 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     'support_cat_payment',
     'support_cat_upload_failed',
     'support_cat_youtube_connection',
-    'support_cat_facebook_connection',
     'support_cat_account_login',
     'support_cat_app_bug',
     'support_cat_other',
@@ -97,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
-  // ⚠️ CHANGED: no longer quits early when the cached user has no channel yet
+  // No longer quits early when the cached user has no channel yet
   // (that was the bug: right after connecting, the cached user was still empty).
   // A 404 simply means "not connected" -> show the Connect YouTube card.
   Future<void> _loadLiveChannel() async {
@@ -126,40 +128,50 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
+  // Icon shown in the beige circle of each help category.
+  Widget _supportLeading(String key) {
+    const c = DiwaliColors.purpleDeep;
+    switch (key) {
+      case 'support_cat_payment':
+        return const Icon(Icons.diamond_outlined, color: c, size: 20);
+      case 'support_cat_upload_failed':
+        return const Icon(Icons.cloud_off_rounded, color: c, size: 20);
+      case 'support_cat_youtube_connection':
+        return const YoutubeIcon(size: 20);
+      case 'support_cat_facebook_connection':
+        return const FacebookIcon(size: 20);
+      case 'support_cat_account_login':
+        return const Icon(Icons.lock_person_rounded, color: c, size: 20);
+      case 'support_cat_app_bug':
+        return const Icon(Icons.bug_report_rounded, color: c, size: 20);
+      default:
+        return const Icon(Icons.help_outline_rounded, color: c, size: 20);
+    }
+  }
+
+  // ⚠️ CHANGED: showModalBottomSheet -> showDiwaliSheet. The old sheet was plain
+  // white (bottom sheets are not part of the global Diwali page background) and
+  // could slide under the Android 3-button / gesture bar. The Diwali sheet shows
+  // the festival artwork and keeps its content above the system bar.
   Future<void> _openSupport() async {
-    final categoryKey = await showModalBottomSheet<String>(
+    final categoryKey = await showDiwaliSheet<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetContext) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + MediaQuery.of(sheetContext).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999)),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(context.tr('support_sheet_title'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(height: 6),
-                ..._supportCategoryKeys.map((k) => ListTile(
-                      title: Text(context.tr(k), style: const TextStyle(fontSize: 14)),
-                      trailing: Icon(Icons.chevron_right, color: context.surfaces.textDim, size: 18),
-                      onTap: () => Navigator.pop(sheetContext, k),
-                    )),
-              ],
-            ),
-          ),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DiwaliSheetTitle(text: context.tr('support_sheet_title')),
+            const SizedBox(height: 4),
+            for (var i = 0; i < _supportCategoryKeys.length; i++) ...[
+              if (i > 0) const DiwaliSheetDivider(),
+              DiwaliSheetTile(
+                leading: _supportLeading(_supportCategoryKeys[i]),
+                title: context.tr(_supportCategoryKeys[i]),
+                onTap: () => Navigator.pop(sheetContext, _supportCategoryKeys[i]),
+              ),
+            ],
+          ],
         );
       },
     );
@@ -210,70 +222,66 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
+  // ⚠️ CHANGED: also a Diwali sheet now (same fix as _openSupport).
   Future<void> _openYoutubeOptions(Map<String, dynamic> channel) async {
-    final action = await showModalBottomSheet<String>(
+    final thumb = (channel['thumbnail'] ?? '').toString();
+    final action = await showDiwaliSheet<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (sheetContext) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(0, 8, 0, 8 + MediaQuery.of(sheetContext).viewInsets.bottom),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40, height: 4,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999)),
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(36, 4, 36, 12),
+              child: Row(children: [
+                thumb.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          thumb,
+                          width: 40, height: 40, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const YoutubeIcon(size: 22),
+                        ),
+                      )
+                    : const YoutubeIcon(size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        channel['channelTitle'] ?? context.tr('up_youtube_label'),
+                        style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${channel['subscriberCount'] ?? 0} ${context.tr('subscribers_label')}',
+                        style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(children: [
-                    channel['thumbnail'] != null && channel['thumbnail'].toString().isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(
-                              channel['thumbnail'],
-                              width: 36, height: 36, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const YoutubeIcon(size: 20),
-                            ),
-                          )
-                        : const YoutubeIcon(size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(channel['channelTitle'] ?? context.tr('up_youtube_label'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text('${channel['subscriberCount'] ?? 0} ${context.tr('subscribers_label')}', style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ]),
-                ),
-                const SizedBox(height: 8),
-                Divider(color: context.surfaces.border, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.edit_note_rounded, color: AppColors.purple),
-                  // TODO: move these two strings into app_strings.dart for multi-language.
-                  title: const Text('Open YouTube Studio', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: Text('Change channel name, handle & logo', style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
-                  trailing: Icon(Icons.open_in_new_rounded, color: context.surfaces.textDim, size: 18),
-                  onTap: () => Navigator.pop(sheetContext, 'studio'),
-                ),
-                Divider(color: context.surfaces.border, height: 1),
-                ListTile(
-                  leading: const Icon(Icons.link_off_rounded, color: AppColors.red),
-                  title: Text(context.tr('disconnect_action'), style: const TextStyle(color: AppColors.red, fontWeight: FontWeight.w600)),
-                  onTap: () => Navigator.pop(sheetContext, 'disconnect'),
-                ),
-              ],
+              ]),
             ),
-          ),
+            const DiwaliSheetDivider(),
+            DiwaliSheetTile(
+              icon: Icons.edit_note_rounded,
+              // TODO: move these two strings into app_strings.dart for multi-language.
+              title: 'Open YouTube Studio',
+              subtitle: 'Change channel name, handle & logo',
+              trailing: const Icon(Icons.open_in_new_rounded, color: DiwaliColors.textDim, size: 18),
+              onTap: () => Navigator.pop(sheetContext, 'studio'),
+            ),
+            const DiwaliSheetDivider(),
+            DiwaliSheetTile(
+              icon: Icons.link_off_rounded,
+              danger: true,
+              title: context.tr('disconnect_action'),
+              trailing: const SizedBox.shrink(),
+              onTap: () => Navigator.pop(sheetContext, 'disconnect'),
+            ),
+          ],
         );
       },
     );
@@ -439,6 +447,19 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     );
   }
 
+  // Card look shared by the YouTube card (white, radius 20, soft shadow).
+  BoxDecoration _cardDecoration({Gradient? gradient}) {
+    return BoxDecoration(
+      color: Colors.white,
+      gradient: gradient,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.55)),
+      boxShadow: [
+        BoxShadow(color: DiwaliColors.purpleDark.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 5)),
+      ],
+    );
+  }
+
   Widget _youtubeSubscriberCard(Map<String, dynamic>? cachedChannel) {
     final channel = _liveChannel ?? cachedChannel;
     if (channel == null) {
@@ -446,16 +467,13 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
         onTap: _connectYoutube,
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border.all(color: context.surfaces.border),
-            borderRadius: BorderRadius.circular(18),
-          ),
+          decoration: _cardDecoration(),
           child: Row(
             children: [
               Container(
                 width: 48, height: 48,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: context.surfaces.textDim.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(14)),
+                decoration: const BoxDecoration(color: DiwaliColors.iconCircle, shape: BoxShape.circle),
                 child: const YoutubeIcon(size: 24),
               ),
               const SizedBox(width: 14),
@@ -463,13 +481,13 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(context.tr('connect_youtube_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text(context.tr('connect_youtube_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: DiwaliColors.purpleDark)),
                     const SizedBox(height: 2),
-                    Text(context.tr('connect_youtube_subtitle'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                    Text(context.tr('connect_youtube_subtitle'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: context.surfaces.textDim),
+              const Icon(Icons.chevron_right, color: DiwaliColors.textDim),
             ],
           ),
         ),
@@ -482,10 +500,8 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
       onTap: () => _openYoutubeOptions(channel),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [AppColors.red.withValues(alpha: 0.10), AppColors.red.withValues(alpha: 0.02)]),
-          border: Border.all(color: context.surfaces.border),
-          borderRadius: BorderRadius.circular(18),
+        decoration: _cardDecoration(
+          gradient: LinearGradient(colors: [AppColors.red.withValues(alpha: 0.08), Colors.white]),
         ),
         child: Row(
           children: [
@@ -511,7 +527,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: DiwaliColors.purpleDark), maxLines: 1, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -520,16 +536,16 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.red),
                       ),
                       const SizedBox(width: 6),
-                      Text(context.tr('subscribers_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12, fontWeight: FontWeight.w600)),
+                      Text(context.tr('subscribers_label'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12, fontWeight: FontWeight.w600)),
                       if (_loadingChannel) ...[
                         const SizedBox(width: 8),
-                        SizedBox(width: 11, height: 11, child: CircularProgressIndicator(strokeWidth: 1.6, color: context.surfaces.textDim)),
+                        const SizedBox(width: 11, height: 11, child: CircularProgressIndicator(strokeWidth: 1.6, color: DiwaliColors.textDim)),
                       ],
                       if (_liveChannelFetchFailed && !_loadingChannel) ...[
                         const SizedBox(width: 8),
                         GestureDetector(
                           onTap: _loadLiveChannel,
-                          child: Icon(Icons.refresh_rounded, size: 14, color: context.surfaces.textDim),
+                          child: const Icon(Icons.refresh_rounded, size: 14, color: DiwaliColors.textDim),
                         ),
                       ],
                     ],
@@ -537,7 +553,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                 ],
               ),
             ),
-            Icon(Icons.more_horiz_rounded, color: context.surfaces.textDim),
+            const Icon(Icons.more_horiz_rounded, color: DiwaliColors.textDim),
           ],
         ),
       ),
@@ -559,133 +575,140 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     final auth = context.watch<AuthProvider>();
     final user = auth.user ?? {};
     final channel = user['youtubeChannel'];
-    final facebook = _metaStatus?['facebook'];
-    final instagram = _metaStatus?['instagram'];
-    return AppBrandBackground(
-      watermarkWhenNormal: false,
-      child: Scaffold(
-        appBar: AppBar(title: Text(context.tr('profile_settings_title'))),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
-          children: [
-            _youtubeSubscriberCard(channel),
-            const SizedBox(height: 16),
-            // ---------------- Creator OS (VidIQ-style tools) ----------------
-            Text(context.tr('creator_os_section'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-              child: Column(children: [
-                // ⚠️ NEW — Live Streaming feature, top of Creator OS list
-                // (isse feature ki visibility zyada hogi). 'menu_live_stream'
-                // translation key app_strings.dart mein add karni hogi
-                // (jaise baaki menu keys hain — 'en': 'Live Stream',
-                // 'hi': 'लाइव स्ट्रीम', waghera).
-                _menuRow(Icons.podcasts_rounded, context.tr('menu_live_stream'), AppColors.red,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))),
-                _divider(),
-                _menuRow(Icons.auto_awesome_rounded, context.tr('menu_ai_ideas'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen()))),
-                _divider(),
-                _menuRow(Icons.title_rounded, context.tr('menu_ai_title_desc'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen()))),
-                _divider(),
-                // ⚠️ Uses translation key (multi-language support) — NOT
-                // hardcoded, so it follows the selected app language. Update
-                // the VALUE of 'menu_seo_optimizer' in app_strings.dart to
-                // "Video SEO Optimizer" (all languages) — see keys below.
-                _menuRow(Icons.query_stats_rounded, context.tr('menu_seo_optimizer'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeoOptimizerScreen()))),
-                _divider(),
-                _menuRow(Icons.radar_rounded, context.tr('menu_competitor_radar'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen()))),
-                _divider(),
-                _menuRow(Icons.calendar_month_rounded, context.tr('menu_smart_scheduler'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SmartSchedulerScreen()))),
-                _divider(),
-                _menuRow(Icons.image_search_rounded, context.tr('menu_visual_analyzer'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VisualAnalyzerScreen()))),
-                _divider(),
-                // ⚠️ Uses translation key (multi-language support) — NOT
-                // hardcoded. Update the VALUE of 'menu_channel_audit' in
-                // app_strings.dart to "Channel SEO Score" (all languages).
-                _menuRow(Icons.fact_check_rounded, context.tr('menu_channel_audit'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen()))),
-                _divider(),
-                _menuRow(Icons.video_collection_rounded, context.tr('menu_my_videos'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyVideosScreen()))),
-                _divider(),
-                _menuRow(Icons.receipt_long_rounded, context.tr('menu_wallet_refund_logs'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletRefundLogsScreen()))),
-              ]),
-            ),
-            const SizedBox(height: 20),
-            // ⚠️ REORDERED (Boss request — "Subscription & Wallet ko Buy
-            // Diamonds ke upar karo"): subscription_wallet row now comes
-            // FIRST, buy_diamonds row moved second. Nothing else in this
-            // block changed.
-            Container(
-              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-              child: Column(children: [
-                _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
-                _divider(),
-                _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
-                _divider(),
-                _menuRow(Icons.card_giftcard_rounded, context.tr('menu_gift_code'), AppColors.diamond,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),
-                _divider(),
-                _menuRow(Icons.card_giftcard_rounded, context.tr('refer_earn'), AppColors.green,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferEarnScreen()))),
-                _divider(),
-                _menuRow(Icons.notifications_rounded, context.tr('notifications'), AppColors.purpleLight,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
-                _divider(),
-                _menuRow(Icons.help_rounded, context.tr('help_support'), AppColors.purple, _openSupport),
-                if (auth.isAdmin) ...[
-                  _divider(),
-                  _menuRow(Icons.admin_panel_settings_rounded, context.tr('admin_panel'), AppColors.red,
-                      () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen()))),
-                ],
-              ]),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-              child: Column(children: [
-                _menuRow(Icons.info_rounded, context.tr('about'), AppColors.purpleLight,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen()))),
-                _divider(),
-                _menuRow(Icons.privacy_tip_rounded, context.tr('privacy_policy'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()))),
-                _divider(),
-                _menuRow(Icons.star_rounded, context.tr('rate_us'), AppColors.diamond,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RateUsScreen()))),
-                _divider(),
-                _menuRow(Icons.settings_rounded, context.tr('settings_menu'), AppColors.purple,
-                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
-              ]),
-            ),
-            const SizedBox(height: 20),
-          ],
+
+    final scaffold = Scaffold(
+      appBar: AppBar(
+        // Side spacing keeps the title clear of the hanging diyas in the artwork.
+        titleSpacing: widget.embedded ? 36 : null,
+        title: Text(
+          context.tr('profile_settings_title'),
+          style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w800),
+        ),
+      ),
+      body: ListView(
+        // Bottom padding is small: when embedded, the body already ends above
+        // the floating nav bar, so nothing is hidden behind it.
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        children: [
+          _youtubeSubscriberCard(channel),
+          const SizedBox(height: 16),
+          // ---------------- Creator OS (VidIQ-style tools) ----------------
+          Text(context.tr('creator_os_section'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          _menuCard([
+            // Live Streaming feature, top of Creator OS list.
+            _menuRow(Icons.podcasts_rounded, context.tr('menu_live_stream'), AppColors.red,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))),
+            _divider(),
+            _menuRow(Icons.auto_awesome_rounded, context.tr('menu_ai_ideas'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen()))),
+            _divider(),
+            _menuRow(Icons.title_rounded, context.tr('menu_ai_title_desc'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen()))),
+            _divider(),
+            // Uses translation key (multi-language support) — NOT hardcoded.
+            _menuRow(Icons.query_stats_rounded, context.tr('menu_seo_optimizer'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SeoOptimizerScreen()))),
+            _divider(),
+            _menuRow(Icons.radar_rounded, context.tr('menu_competitor_radar'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen()))),
+            _divider(),
+            _menuRow(Icons.calendar_month_rounded, context.tr('menu_smart_scheduler'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SmartSchedulerScreen()))),
+            _divider(),
+            _menuRow(Icons.image_search_rounded, context.tr('menu_visual_analyzer'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VisualAnalyzerScreen()))),
+            _divider(),
+            _menuRow(Icons.fact_check_rounded, context.tr('menu_channel_audit'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen()))),
+            _divider(),
+            _menuRow(Icons.video_collection_rounded, context.tr('menu_my_videos'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyVideosScreen()))),
+            _divider(),
+            _menuRow(Icons.receipt_long_rounded, context.tr('menu_wallet_refund_logs'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletRefundLogsScreen()))),
+          ]),
+          const SizedBox(height: 20),
+          // Subscription & Wallet comes FIRST, Buy Diamonds second.
+          _menuCard([
+            _menuRow(Icons.diamond_rounded, context.tr('subscription_wallet'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WalletScreen()))),
+            _divider(),
+            _menuRow(Icons.shopping_bag_rounded, context.tr('buy_diamonds'), AppColors.diamond,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))),
+            _divider(),
+            _menuRow(Icons.card_giftcard_rounded, context.tr('menu_gift_code'), AppColors.diamond,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GiftCodeScreen()))),
+            _divider(),
+            _menuRow(Icons.card_giftcard_rounded, context.tr('refer_earn'), AppColors.green,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReferEarnScreen()))),
+            _divider(),
+            _menuRow(Icons.notifications_rounded, context.tr('notifications'), AppColors.purpleLight,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
+            _divider(),
+            _menuRow(Icons.help_rounded, context.tr('help_support'), AppColors.purple, _openSupport),
+            if (auth.isAdmin) ...[
+              _divider(),
+              _menuRow(Icons.admin_panel_settings_rounded, context.tr('admin_panel'), AppColors.red,
+                  () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminScreen()))),
+            ],
+          ]),
+          const SizedBox(height: 12),
+          _menuCard([
+            _menuRow(Icons.info_rounded, context.tr('about'), AppColors.purpleLight,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen()))),
+            _divider(),
+            _menuRow(Icons.privacy_tip_rounded, context.tr('privacy_policy'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()))),
+            _divider(),
+            _menuRow(Icons.star_rounded, context.tr('rate_us'), AppColors.diamond,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RateUsScreen()))),
+            _divider(),
+            _menuRow(Icons.settings_rounded, context.tr('settings_menu'), AppColors.purple,
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+          ]),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+
+    // ⚠️ FIX: as a tab inside the dashboard, the dashboard already provides the
+    // background (and hides the bottom artwork behind its own nav bar). Wrapping
+    // it again here drew a SECOND artwork copy right above the nav bar. So the
+    // wrapper is only used when the screen is opened on its own.
+    if (widget.embedded) return scaffold;
+    return AppBrandBackground(watermarkWhenNormal: false, child: scaffold);
+  }
+
+  // White Diwali card (radius 20, soft shadow). The inner Material keeps the
+  // ListTile ripple visible on top of the white card.
+  Widget _menuCard(List<Widget> children) {
+    return DiwaliCard(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(children: children),
         ),
       ),
     );
   }
 
+  // Every icon: rounded icon inside a light beige circle (same as dashboard).
   Widget _menuRow(IconData icon, String label, Color color, VoidCallback onTap) {
     return ListTile(
       leading: Container(
-        width: 34, height: 34,
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, color: color, size: 17),
+        width: 36, height: 36,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(color: DiwaliColors.iconCircle, shape: BoxShape.circle),
+        child: Icon(icon, color: color, size: 18),
       ),
-      title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-      trailing: Icon(Icons.chevron_right, color: context.surfaces.textDim),
+      title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: DiwaliColors.purpleDark)),
+      trailing: const Icon(Icons.chevron_right, color: DiwaliColors.textDim),
       onTap: onTap,
     );
   }
 
-  Widget _divider() => Divider(height: 1, color: context.surfaces.border);
+  Widget _divider() => Divider(height: 1, color: DiwaliColors.cardBorder.withValues(alpha: 0.5));
 }

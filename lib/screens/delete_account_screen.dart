@@ -23,11 +23,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
   bool _understood = false;
   // Translation keys for each consequence line — resolved via context.tr()
   // in build() so this list follows the selected language.
+  //
+  // ⚠️ CHANGED (Boss request): 'delete_consequence_connections'
+  // ("Your YouTube, Facebook and Instagram connections") removed from the list.
   static const _consequenceKeys = [
     'delete_consequence_profile',
     'delete_consequence_videos',
     'delete_consequence_payment',
-    'delete_consequence_connections',
     'delete_consequence_referral',
   ];
 

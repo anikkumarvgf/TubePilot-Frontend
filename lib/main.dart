@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -16,6 +17,8 @@ import 'screens/meta_page_picker_screen.dart';
 import 'screens/my_videos_screen.dart';
 import 'widgets/common.dart';
 import 'widgets/app_brand_background.dart';
+import 'widgets/app_nav.dart';
+import 'widgets/diwali_decor.dart' show DiwaliBottomNav;
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -24,6 +27,19 @@ const String oneSignalAppId = '205c5c05-ad00-4e06-a8f4-d7ff9245ccfd';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ⚠️ NEW: edge-to-edge + transparent system bars. Phone chahe gesture navigation pe ho
+  // ya 3-button navigation pe, app ek hi tarah se behave karti hai; neeche ki jagah
+  // MaterialApp.builder (niche) sambhalta hai.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarContrastEnforced: false,
+  ));
 
   // Keep only the FAST local read (SharedPreferences) before runApp().
   // Slow Firebase/OneSignal init runs after runApp() so it never blocks
@@ -261,6 +277,52 @@ class _TubePilotAppState extends State<TubePilotApp> {
               theme: AppTheme.light.copyWith(pageTransitionsTheme: _festivalTransitions),
               darkTheme: AppTheme.dark.copyWith(pageTransitionsTheme: _festivalTransitions),
               themeMode: themeProvider.themeMode,
+              // ⚠️ NEW — SYSTEM NAV BAR (buttons + gestures) ka ek hi hal, sab screens ke liye.
+              // Android ka neeche wala system area (3-button bar ~48dp, gesture mode mein
+              // bahut chhota/0) app ke content ko dabaye nahi — saari screens uske UPAR
+              // banti hain, aur woh patti cream rehti hai. Keyboard khulne par `padding`
+              // apne aap 0 ho jaata hai, isliye keyboard ke upar extra gap nahi banta.
+              // ⚠️ NEW — ONE bottom nav bar for the whole app. It is drawn here, below the
+              // Navigator, so it shows on every screen (My Videos, Wallet, ...) after login and
+              // never overlaps content: each screen simply gets the space above the bar.
+              // Hidden while the keyboard is open, and on Splash/Login (Dashboard not alive).
+              builder: (context, child) {
+                final bottom = MediaQuery.paddingOf(context).bottom;
+                final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+                return ColoredBox(
+                  color: AppColors.festivalIvory,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: bottom),
+                    child: MediaQuery.removePadding(
+                      context: context,
+                      removeBottom: true,
+                      child: AnimatedBuilder(
+                        animation: AppNav.instance,
+                        builder: (context, _) {
+                          final showNav = AppNav.instance.visible && !keyboardOpen;
+                          return Column(
+                            children: [
+                              Expanded(child: child ?? const SizedBox.shrink()),
+                              if (showNav)
+                                DiwaliBottomNav(
+                                  currentIndex: AppNav.instance.tab,
+                                  onTap: (i) {
+                                    AppNav.instance.setTab(i);
+                                    // Back to the Dashboard (closes any pushed screens / dialogs).
+                                    final r = AppNav.instance.dashboardRoute;
+                                    if (r != null && r.isActive) {
+                                      navigatorKey.currentState?.popUntil((x) => x == r);
+                                    }
+                                  },
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
               home: const SplashScreen(),
             ),
           );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/theme_provider.dart';
 import 'brand_icons.dart';
 import 'diwali_decor.dart';
 
@@ -9,6 +11,8 @@ import 'diwali_decor.dart';
 ///  * [showDiwaliWelcome]           -> "Welcome to TubePilot / Happy Diwali" popup
 ///  * [maybeShowDiwaliWelcome]      -> sirf ek baar dikhata hai (SharedPreferences)
 ///  * [showDiwaliConnectYoutube]    -> chhota "Connect Your YouTube Channel" popup
+///  * [showDiwaliSheet]             -> ⚠️ NEW: Diwali bottom sheet (help / options menus)
+///      + [DiwaliSheetTitle], [DiwaliSheetTile], [DiwaliSheetDivider]
 ///
 /// Rate Us / baaki popups ko bhi isi shell mein daal sakte ho.
 
@@ -103,6 +107,244 @@ class DiwaliPopupShell extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ⚠️ NEW — Diwali bottom sheet
+//
+// Why: showModalBottomSheet routes are NOT PageRoutes, so the global Diwali
+// page background never reaches them -> sheets were plain white. Use this
+// instead of showModalBottomSheet:
+//
+//   final k = await showDiwaliSheet<String>(
+//     context: context,
+//     builder: (sheetContext) => Column(
+//       mainAxisSize: MainAxisSize.min,
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         const DiwaliSheetTitle(text: 'What do you need help with?'),
+//         DiwaliSheetTile(icon: Icons.payments_rounded, title: 'Payment',
+//             onTap: () => Navigator.pop(sheetContext, 'payment')),
+//       ],
+//     ),
+//   );
+//
+// The sheet shows the same festival artwork as the pages (hanging diyas at the
+// top corners), and keeps its content ABOVE the Android system navigation area
+// (3-button bar and gesture bar) and above the keyboard.
+// ---------------------------------------------------------------------------
+Future<T?> showDiwaliSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  bool isDismissible = true,
+}) {
+  return showModalBottomSheet<T>(
+    context: context,
+    isScrollControlled: true,
+    // Keeps the sheet clear of the status bar / notch (top, left, right).
+    // The bottom is handled inside _DiwaliSheetFrame with SafeArea.
+    useSafeArea: true,
+    isDismissible: isDismissible,
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+    barrierColor: Colors.black54,
+    builder: (sheetContext) => _DiwaliSheetFrame(child: builder(sheetContext)),
+  );
+}
+
+class _DiwaliSheetFrame extends StatelessWidget {
+  final Widget child;
+  const _DiwaliSheetFrame({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = context.watch<ThemeProvider>().festivalBackgroundAsset;
+    final width = MediaQuery.sizeOf(context).width;
+    // Top half of the 9:16 festival artwork (1152 x 2048).
+    final artHeight = width * (2048 / 1152) / 2;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    const radius = Radius.circular(28);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: DiwaliColors.creamTop,
+        borderRadius: const BorderRadius.vertical(top: radius),
+        border: Border(
+          top: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.8), width: 1.4),
+          left: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4), width: 1),
+          right: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4), width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, -6)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(27)),
+        child: Stack(
+          children: [
+            if (asset != null)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: artHeight,
+                child: IgnorePointer(
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    // Fade the artwork out downwards so list text stays readable.
+                    shaderCallback: (rect) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.white, Colors.white, Colors.transparent],
+                      stops: [0.0, 0.5, 1.0],
+                    ).createShader(rect),
+                    child: ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: 0.5,
+                        child: Image.asset(
+                          asset,
+                          width: width,
+                          fit: BoxFit.fitWidth,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // ⚠️ SafeArea (bottom) = system 3-button bar / gesture bar. The cream
+            // background above still runs behind it, so there is no gap.
+            SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(0, 10, 0, 12 + keyboard),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        decoration: BoxDecoration(
+                          color: DiwaliColors.gold.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    child,
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Sheet heading. Side padding (36) keeps it clear of the hanging diyas.
+class DiwaliSheetTitle extends StatelessWidget {
+  final String text;
+  final Widget? leading;
+  const DiwaliSheetTitle({super.key, required this.text, this.leading});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(36, 4, 36, 8),
+      child: Row(
+        children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 12)],
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One row of a Diwali sheet: icon in a beige circle, title, optional subtitle,
+/// chevron. [danger] makes it red (e.g. Disconnect).
+class DiwaliSheetTile extends StatelessWidget {
+  final IconData? icon;
+  final Widget? leading;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  final bool danger;
+  final VoidCallback? onTap;
+
+  const DiwaliSheetTile({
+    super.key,
+    required this.title,
+    this.icon,
+    this.leading,
+    this.subtitle,
+    this.trailing,
+    this.danger = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const red = Color(0xFFDC2626);
+    final color = danger ? red : DiwaliColors.purpleDark;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.iconCircle),
+              child: leading ?? Icon(icon ?? Icons.circle_outlined, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: color, fontSize: 14.5, fontWeight: FontWeight.w600)),
+                  if (subtitle != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(subtitle!, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            trailing ?? const Icon(Icons.chevron_right_rounded, color: DiwaliColors.textDim, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DiwaliSheetDivider extends StatelessWidget {
+  const DiwaliSheetDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 36),
+      color: DiwaliColors.cardBorder.withValues(alpha: 0.55),
     );
   }
 }

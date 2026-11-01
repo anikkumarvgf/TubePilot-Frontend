@@ -10,8 +10,9 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
-// Festival background + clean white cards (shared decor)
+// Painted cream background (no image) + clean white cards + diya bottom nav (shared decor)
 import '../widgets/diwali_decor.dart';
+import '../widgets/app_nav.dart';
 // Diwali welcome popup + shared popup shell
 import '../widgets/diwali_popups.dart';
 // Milestone achievement popup (subscribers / views card)
@@ -46,7 +47,32 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _tabIndex = 0;
+  // The tab index and the bottom bar live in AppNav / main.dart (one bar for the
+  // whole app). This screen only shows the selected tab's content.
+  void _onNav() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AppNav.instance.addListener(_onNav);
+    AppNav.instance.setDashboardMounted(true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    AppNav.instance.dashboardRoute = ModalRoute.of(context);
+  }
+
+  @override
+  void dispose() {
+    AppNav.instance.removeListener(_onNav);
+    AppNav.instance.dashboardRoute = null;
+    AppNav.instance.setDashboardMounted(false);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,15 +84,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const ProfileScreen(embedded: true),
     ];
 
-    // ⚠️ FIX (bottom overlap): the background now lives here, behind the
-    // Scaffold, and extendBody is FALSE. The body therefore ends exactly where
-    // the floating bottom bar begins, so content can never slide underneath it.
-    return DiwaliBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBody: false,
-        body: IndexedStack(index: _tabIndex, children: screens),
-        bottomNavigationBar: AppBottomNav(currentIndex: _tabIndex, onTap: (i) => setState(() => _tabIndex = i)),
+    // ⚠️ FIX (Android 3-button bar): this region tells Android to draw the
+    // system navigation bar in cream with DARK icons (Back / Home / Recents),
+    // and the status bar with dark icons. Without it the bar stayed black.
+    //
+    // ⚠️ FIX (bottom overlap): the background lives here, behind the Scaffold,
+    // and extendBody is FALSE. The body therefore ends exactly where the
+    // floating bottom bar begins, so content can never slide underneath it.
+    // DiwaliBottomNav itself is wrapped in SafeArea, so it always sits ABOVE
+    // the system navigation buttons.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: DiwaliColors.creamTop,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: DiwaliBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBody: false,
+          body: IndexedStack(index: AppNav.instance.tab, children: screens),
+          // No bottomNavigationBar here: the bar is drawn once in main.dart
+          // (MaterialApp.builder), so it also shows on pushed screens.
+        ),
       ),
     );
   }
@@ -317,18 +361,28 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     final worthUploads = diamondBalance ~/ _diamondCostPerUpload;
     final free = _freeUploads();
 
-    // The festival background is provided by DashboardScreen, so this
-    // Scaffold is simply transparent.
-    return Scaffold(
+    // The cream background is provided by DashboardScreen, so this
+    // Scaffold is simply transparent. The two hanging diyas are drawn on top
+    // (IgnorePointer, so they never block taps).
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        // Status bar only (the system navigation bar style is set once in
+        // DashboardScreen, so this must NOT touch it).
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         toolbarHeight: 66,
-        // Side spacing keeps title / buttons clear of the hanging diyas in the artwork.
+        // Side spacing keeps the logo / buttons clear of the hanging diyas.
         titleSpacing: 36,
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -406,28 +460,51 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
           : RefreshIndicator(
               onRefresh: () => _load(showLoader: false),
               child: ListView(
-                // Bottom padding is small now: the body already ends above the
+                // Bottom padding is small: the body already ends above the
                 // floating nav bar (extendBody: false), so nothing is hidden.
                 padding: const EdgeInsets.fromLTRB(_kScreenPadding, 8, _kScreenPadding, 24),
                 children: [
-                  // ---- Greeting (large + bold) and subtext (small + grey) ----
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      '${context.tr('hello_greeting')} ${_userFirstName(context)}! 👋',
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: DiwaliColors.purpleDark,
-                        letterSpacing: -0.4,
+                  // ---- Greeting (large + bold) + subtext (small + grey) + Happy Diwali badge ----
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '${context.tr('hello_greeting')} ${_userFirstName(context)}! 👋',
+                                style: const TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w800,
+                                  color: DiwaliColors.purpleDark,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              context.tr('welcome_back_subtitle'),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13.5, height: 1.25),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    context.tr('welcome_back_subtitle'),
-                    style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13.5, height: 1.25),
+                      const SizedBox(width: 8),
+                      // Badge + marigold flowers on its right edge.
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const _HappyDiwaliBadge(),
+                          const Positioned(right: -22, top: 2, child: IgnorePointer(child: DiwaliSideFlowers())),
+                        ],
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 18),
 
@@ -745,6 +822,14 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                 ],
               ),
             ),
+        ),
+        const Positioned(top: 0, left: 0, child: IgnorePointer(child: DiwaliHangingDiyas(scale: 0.62))),
+        Positioned(
+          top: 0,
+          right: 0,
+          child: IgnorePointer(child: Transform.flip(flipX: true, child: const DiwaliHangingDiyas(scale: 0.62))),
+        ),
+      ],
     );
   }
 
@@ -934,6 +1019,51 @@ class _IconCircle extends StatelessWidget {
       alignment: Alignment.center,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.iconCircle),
       child: Icon(icon, color: DiwaliColors.purpleDeep, size: iconSize),
+    );
+  }
+}
+
+// "Happy Diwali" badge next to the greeting.
+class _HappyDiwaliBadge extends StatelessWidget {
+  const _HappyDiwaliBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 112,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const DiwaliDiya(width: 34),
+          Transform.translate(
+            offset: const Offset(-18, -4),
+            child: Text(
+              'Happy',
+              style: DiwaliColors.script.copyWith(color: DiwaliColors.purple, fontSize: 15, fontWeight: FontWeight.w600, height: 1.0),
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(0, -8),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'Diwali',
+                style: DiwaliColors.script.copyWith(color: DiwaliColors.purpleDark, fontSize: 36, fontWeight: FontWeight.w800, height: 1.0),
+              ),
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(0, -6),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '\u2022 STAY CREATIVE \u2022 STAY BLESSED \u2022',
+                style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 6.5, letterSpacing: 0.9, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
