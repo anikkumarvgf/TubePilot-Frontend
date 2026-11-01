@@ -84,7 +84,14 @@ class _CompetitorVideosScreenState extends State<CompetitorVideosScreen> {
     return AppBrandBackground(
       watermarkWhenNormal: false,
       child: Scaffold(
-        appBar: AppBar(title: Text(widget.title ?? context.tr('rd_videos_title'))),
+        // transparent so the Diwali background shows through (opaque Scaffold hid it)
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          title: Text(widget.title ?? context.tr('rd_videos_title')),
+        ),
         body: Column(
           children: [
             SizedBox(

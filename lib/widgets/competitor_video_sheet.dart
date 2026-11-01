@@ -16,7 +16,13 @@ Future<void> showCompetitorVideoSheet(BuildContext context, Map<String, dynamic>
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    // The app theme's scaffold colour is transparent (festival background), which made
+    // this sheet see-through so the page behind it showed through the text.
+    // Use a solid colour instead.
+    backgroundColor: Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xFF1B1422)
+        : const Color(0xFFFFF8E7),
+    clipBehavior: Clip.antiAlias,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
     builder: (_) => _VideoSheet(video: video),
   );
