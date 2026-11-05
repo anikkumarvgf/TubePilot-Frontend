@@ -3,7 +3,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/app_brand_background.dart';
-import '../widgets/diwali_decor.dart';
+import '../widgets/app_decor.dart';
 import '../providers/language_provider.dart';
 import 'diamond_store_screen.dart';
 
@@ -74,7 +74,7 @@ class _WalletScreenState extends State<WalletScreen> {
   void _pickRange() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: DiwaliColors.creamTop,
+      backgroundColor: UiColors.bg,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (c) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -82,7 +82,7 @@ class _WalletScreenState extends State<WalletScreen> {
           for (final d in const [7, 30, 90])
             ListTile(
               title: Text(context.tr('wr_last_days').replaceAll('%1', '$d'),
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: DiwaliColors.purpleDark)),
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: UiColors.purpleDark)),
               trailing: _days == d ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
               onTap: () {
                 Navigator.pop(c);
@@ -140,7 +140,7 @@ class _WalletScreenState extends State<WalletScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        title: Text(context.tr('wallet_title'), style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w800)),
+        title: Text(context.tr('wallet_title'), style: const TextStyle(color: UiColors.purpleDark, fontWeight: FontWeight.w800)),
       ),
       body: loading
           ? const LoadingView()
@@ -164,21 +164,21 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _balanceCard() {
-    return DiwaliCard(
+    return AppCard(
       padding: const EdgeInsets.all(18),
       child: Column(children: [
-        Text(context.tr('total_diamonds'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13)),
+        Text(context.tr('total_diamonds'), style: const TextStyle(color: UiColors.textDim, fontSize: 13)),
         const SizedBox(height: 6),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Icon(Icons.diamond_rounded, color: AppColors.diamond, size: 26),
           const SizedBox(width: 8),
           Text('${wallet?['diamondBalance'] ?? 0}',
-              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark)),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: UiColors.purpleDark)),
         ]),
         const SizedBox(height: 6),
         Text(
           context.tr('free_uploads_remaining').replaceAll('%d', '${wallet?['freeUploadsRemaining'] ?? 0}'),
-          style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5),
+          style: const TextStyle(color: UiColors.textDim, fontSize: 12.5),
         ),
         const SizedBox(height: 14),
         SizedBox(
@@ -188,7 +188,7 @@ class _WalletScreenState extends State<WalletScreen> {
             icon: const Icon(Icons.workspace_premium_rounded, size: 20),
             label: const Text('Subscribe / Buy Diamonds', style: TextStyle(fontWeight: FontWeight.w800)),
             style: ElevatedButton.styleFrom(
-              backgroundColor: DiwaliColors.purple,
+              backgroundColor: UiColors.purple,
               foregroundColor: Colors.white,
               elevation: 0,
               minimumSize: const Size.fromHeight(48),
@@ -213,14 +213,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _tab == i ? DiwaliColors.purple : Colors.white,
+                  color: _tab == i ? UiColors.purple : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _tab == i ? DiwaliColors.purple : DiwaliColors.cardBorder.withValues(alpha: 0.7)),
+                  border: Border.all(color: _tab == i ? UiColors.purple : UiColors.cardBorder.withValues(alpha: 0.7)),
                 ),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(labels[i],
-                      style: TextStyle(color: _tab == i ? Colors.white : DiwaliColors.purpleDark, fontWeight: FontWeight.w700, fontSize: 13)),
+                      style: TextStyle(color: _tab == i ? Colors.white : UiColors.purpleDark, fontWeight: FontWeight.w700, fontSize: 13)),
                 ),
               ),
             ),
@@ -238,7 +238,7 @@ class _WalletScreenState extends State<WalletScreen> {
         Row(children: [
           Expanded(
             child: Text(context.tr('auto_refund_history'),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark)),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: UiColors.purpleDark)),
           ),
           const SizedBox(width: 12),
           OutlinedButton(
@@ -247,14 +247,14 @@ class _WalletScreenState extends State<WalletScreen> {
               backgroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: const Size(0, 38),
-              side: BorderSide(color: DiwaliColors.cardBorder.withValues(alpha: 0.8)),
+              side: BorderSide(color: UiColors.cardBorder.withValues(alpha: 0.8)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.expand_more_rounded, size: 16, color: DiwaliColors.purpleDark),
+              const Icon(Icons.expand_more_rounded, size: 16, color: UiColors.purpleDark),
               const SizedBox(width: 6),
               Text(context.tr('wr_last_days').replaceAll('%1', '$_days'),
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: DiwaliColors.purpleDark)),
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: UiColors.purpleDark)),
             ]),
           ),
         ]),
@@ -262,7 +262,7 @@ class _WalletScreenState extends State<WalletScreen> {
           const SizedBox(height: 6),
           Text(
             context.tr('wr_summary').replaceAll('%1', '${_refunds.length}').replaceAll('%2', '$_totalRefunded'),
-            style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12),
+            style: const TextStyle(color: UiColors.textDim, fontSize: 12),
           ),
         ],
         const SizedBox(height: 12),
@@ -272,12 +272,12 @@ class _WalletScreenState extends State<WalletScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 30),
             child: Column(children: [
-              const Icon(Icons.replay_rounded, size: 44, color: DiwaliColors.textDim),
+              const Icon(Icons.replay_rounded, size: 44, color: UiColors.textDim),
               const SizedBox(height: 12),
-              Text(context.tr('wr_empty_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark)),
+              Text(context.tr('wr_empty_title'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: UiColors.purpleDark)),
               const SizedBox(height: 6),
               Text(context.tr('wr_empty_sub'),
-                  textAlign: TextAlign.center, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, height: 1.4)),
+                  textAlign: TextAlign.center, style: const TextStyle(color: UiColors.textDim, fontSize: 12.5, height: 1.4)),
             ]),
           )
         else
@@ -316,16 +316,16 @@ class _WalletScreenState extends State<WalletScreen> {
             if (title.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: DiwaliColors.purpleDark)),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: UiColors.purpleDark)),
             ],
             if (reason.isNotEmpty) ...[
               const SizedBox(height: 3),
               Text(context.tr('wr_reason').replaceAll('%1', reason),
-                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: UiColors.textDim, fontSize: 12)),
             ],
             const SizedBox(height: 4),
             Text([_formatDate(r['refundedAt']), if (platform.isNotEmpty) platform].join('  ·  '),
-                style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5)),
+                style: const TextStyle(color: UiColors.textDim, fontSize: 11.5)),
           ]),
         ),
       ]),
@@ -345,9 +345,9 @@ class _WalletScreenState extends State<WalletScreen> {
             : t['type'] == 'diamond_purchase'
                 ? context.tr('diamond_pack_label').replaceAll('%s', '${t['diamondPackage']}')
                 : (isSpend ? context.tr('video_scheduled_label') : context.tr('diamond_refund_label'));
-        final amount = isSub && (t['diamondPackage'] ?? 0) == 0
-            ? '+${t['uploadsGranted'] ?? 0} uploads'
-            : (t['type'] == 'diamond_purchase' || isSub)
+        final amount = isSub
+            ? '+${t['uploadCredits'] ?? 0} uploads'
+            : t['type'] == 'diamond_purchase'
             ? '+${t['diamondPackage']}'
             : (isSpend ? '-${t['diamondsForSpend']}' : '+${t['diamondsForSpend']}');
         final (color, statusLabel) = _statusBadge(context, t['status'] ?? '');
@@ -358,7 +358,7 @@ class _WalletScreenState extends State<WalletScreen> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border.all(color: isRefund ? AppColors.green.withValues(alpha: 0.5) : DiwaliColors.cardBorder.withValues(alpha: 0.6)),
+            border: Border.all(color: isRefund ? AppColors.green.withValues(alpha: 0.5) : UiColors.cardBorder.withValues(alpha: 0.6)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -372,9 +372,9 @@ class _WalletScreenState extends State<WalletScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: DiwaliColors.purpleDark)),
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: UiColors.purpleDark)),
                   const SizedBox(height: 4),
-                  Text(formatDateTime(t['createdAt']), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12)),
+                  Text(formatDateTime(t['createdAt']), style: const TextStyle(color: UiColors.textDim, fontSize: 12)),
                   if (isRefund && refundNote.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(refundNote, style: const TextStyle(color: AppColors.green, fontSize: 11, fontWeight: FontWeight.w600)),

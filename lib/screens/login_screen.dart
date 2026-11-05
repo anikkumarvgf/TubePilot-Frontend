@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/push_service.dart';
-import '../theme/app_theme.dart';
 import '../widgets/common.dart';
-import '../widgets/diwali_decor.dart';
-import '../widgets/diwali_popups.dart';
+import '../widgets/app_decor.dart';
+import '../widgets/app_popups.dart';
 import '../providers/language_provider.dart';
 import 'username_setup_screen.dart';
 import 'dashboard_screen.dart';
 
+/// Login + Sign Up (one screen, two modes) - layout follows the UI design:
+/// plum header with teal leaves + "Hello!", light rounded sheet with pill fields.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -23,13 +25,17 @@ class _LoginScreenState extends State<LoginScreen> {
   bool loading = false;
   bool googleLoading = false;
   bool obscurePassword = true;
+  bool obscureConfirm = true;
+  bool detailsCorrect = false;
   String? slowServerHint;
   Timer? _slowHintTimer;
 
-  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  static const _hintColor = Color(0xFF6E6070);
 
   void _startSlowHintTimer() {
     _slowHintTimer?.cancel();
@@ -48,10 +54,19 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     _slowHintTimer?.cancel();
-    _nameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
+  }
+
+  void _switchMode() {
+    setState(() {
+      isLogin = !isLogin;
+      detailsCorrect = false;
+      _confirmCtrl.clear();
+      _formKey.currentState?.reset();
+    });
   }
 
   void _goNext(Map<String, dynamic>? user) {
@@ -63,15 +78,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submitEmailAuth() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!isLogin && !detailsCorrect) {
+      showToast(context, 'Please tick "All details correct"', isError: true);
+      return;
+    }
+    FocusScope.of(context).unfocus();
     setState(() => loading = true);
     _startSlowHintTimer();
     final auth = context.read<AuthProvider>();
     try {
+      final email = _emailCtrl.text.trim();
       if (isLogin) {
-        await auth.emailLogin(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+        await auth.emailLogin(email: email, password: _passwordCtrl.text);
       } else {
-        await auth.emailSignup(name: _nameCtrl.text.trim(), email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
-        await markDiwaliWelcomePending(); // new account -> welcome popup once
+        // The design has no name field: use the part before "@" (the username is
+        // chosen on the next screen anyway).
+        await auth.emailSignup(name: email.split('@').first, email: email, password: _passwordCtrl.text);
+        // New account -> Rs1 payment -> connect channel -> welcome (shown on the dashboard).
+        await markOnboardingPending(auth.user);
       }
       if (!mounted) return;
       PushService.initAfterLogin();
@@ -90,10 +114,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     try {
       await auth.googleLogin();
-      // Google: welcome only if the account was created just now (new user).
+      // Google: the new-user flow starts only if the account was created just now.
       final created = DateTime.tryParse('${auth.user?['createdAt'] ?? ''}');
       if (created != null && DateTime.now().difference(created).inMinutes.abs() < 10) {
-        await markDiwaliWelcomePending();
+        await markOnboardingPending(auth.user);
       }
       if (!mounted) return;
       PushService.initAfterLogin();
@@ -122,199 +146,232 @@ class _LoginScreenState extends State<LoginScreen> {
 
   InputDecoration _dec(String hint, IconData icon, {Widget? suffix}) => InputDecoration(
         hintText: hint,
-        prefixIcon: Icon(icon, color: DiwaliColors.purple, size: 22),
+        hintStyle: const TextStyle(color: _hintColor, fontSize: 14.5, fontWeight: FontWeight.w600),
+        prefixIcon: Icon(icon, color: _hintColor, size: 20),
         suffixIcon: suffix,
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.6)),
-        ),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: DiwaliColors.purple, width: 1.6),
+          borderRadius: BorderRadius.circular(28),
+          borderSide: const BorderSide(color: UiColors.plum, width: 1.4),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(28),
           borderSide: const BorderSide(color: Colors.redAccent),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
+          borderRadius: BorderRadius.circular(28),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
         ),
+        errorStyle: const TextStyle(fontSize: 11.5),
       );
 
-  @override
-  Widget build(BuildContext context) {
-    // Whole page is drawn in code (DiwaliAuthBackground) - no PNG background.
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: DiwaliAuthBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
-              child: Form(
-                key: _formKey,
-                child: Column(
+  Widget _eye(bool obscured, VoidCallback onTap) => IconButton(
+        icon: Icon(obscured ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 19, color: _hintColor),
+        onPressed: onTap,
+      );
+
+  Widget _googleButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: googleLoading ? null : _submitGoogle,
+        icon: googleLoading
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : Image.network(
+                'https://developers.google.com/identity/images/g-logo.png',
+                width: 20,
+                height: 20,
+                errorBuilder: (_, __, ___) =>
+                    const Text('G', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFFDB4437))),
+              ),
+        label: const Text('Continue with Google', style: TextStyle(color: UiColors.plum, fontWeight: FontWeight.w700, fontSize: 15)),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          backgroundColor: Colors.white,
+          shape: const StadiumBorder(),
+          side: const BorderSide(color: UiColors.plum, width: 1.1),
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Hello!', style: TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w400, height: 1.05)),
+        if (!isLogin)
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Text(
+              'Welcome To Tube Pilot',
+              style: TextStyle(color: Color(0xFFD9F3EC), fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _sheet() {
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(30, 26, 30, 20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (isLogin) ...[
+              GestureDetector(
+                onTap: _switchMode,
+                behavior: HitTestBehavior.opaque,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
-                      width: 84,
-                      height: 84,
-                      child: Image.asset(
-                        'assets/splash.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: 40),
-                      ),
-                    ),
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-                        children: [
-                          TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF1B0F20))),
-                          TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
-                        ],
-                      ),
-                    ),
-                    Text(context.tr('splash_tagline'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13)),
-                    const SizedBox(height: 14),
-                    const DiwaliTitleOrnament(),
-                    Text(isLogin ? context.tr('welcome_back') : context.tr('create_account'),
-                        style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 26, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
-                    Text(isLogin ? context.tr('sign_in_to_continue') : context.tr('start_scheduling_seconds'),
-                        textAlign: TextAlign.center, style: const TextStyle(color: DiwaliColors.textDim)),
-                    const SizedBox(height: 8),
-                    const DiwaliLotusDivider(width: 190),
-                    const SizedBox(height: 18),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: googleLoading ? null : _submitGoogle,
-                        icon: googleLoading
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Image.network(
-                                'https://developers.google.com/identity/images/g-logo.png',
-                                width: 20, height: 20,
-                                errorBuilder: (_, __, ___) => const Text('G',
-                                    style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Color(0xFFDB4437))),
-                              ),
-                        label: Text(isLogin ? context.tr('continue_with_google') : context.tr('signup_with_google'),
-                            style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w700)),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(52),
-                          backgroundColor: Colors.white,
-                          shape: const StadiumBorder(),
-                          side: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.7)),
-                        ),
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Row(children: [
-                        Expanded(child: Divider(color: DiwaliColors.gold.withValues(alpha: 0.5))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(context.tr('or_continue_with_email'), style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5)),
-                        ),
-                        Expanded(child: Divider(color: DiwaliColors.gold.withValues(alpha: 0.5))),
-                      ]),
-                    ),
-
-                    if (!isLogin) ...[
-                      TextFormField(
-                        controller: _nameCtrl,
-                        decoration: _dec(context.tr('your_full_name_hint'), Icons.person_outline),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? context.tr('enter_your_name_error') : null,
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-
-                    TextFormField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: _dec('you@example.com', Icons.mail_outline),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return context.tr('enter_your_email_error');
-                        if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) return context.tr('enter_valid_email_error');
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-
-                    TextFormField(
-                      controller: _passwordCtrl,
-                      obscureText: obscurePassword,
-                      decoration: _dec(
-                        context.tr('password_label'),
-                        Icons.lock_outline,
-                        suffix: IconButton(
-                          icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              size: 20, color: DiwaliColors.textDim),
-                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                        ),
-                      ),
-                      validator: (v) => (v == null || v.length < 6) ? context.tr('password_min_length_error') : null,
-                    ),
-
-                    if (isLogin)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _forgotPassword,
-                          child: Text(context.tr('forgot_password'), style: const TextStyle(color: AppColors.purple, fontSize: 13)),
-                        ),
-                      ),
-
-                    const SizedBox(height: 14),
-                    DiwaliAuthButton(
-                      label: isLogin ? context.tr('login_btn') : context.tr('signup_btn'),
-                      loading: loading,
-                      onPressed: _submitEmailAuth,
-                    ),
-                    if (slowServerHint != null) ...[
-                      const SizedBox(height: 10),
-                      Text(slowServerHint!, style: const TextStyle(color: AppColors.purpleLight, fontSize: 12), textAlign: TextAlign.center),
-                    ],
-                    const SizedBox(height: 14),
-
-                    // Dark black bottom lines, NO background box. The bottom diya
-                    // art was removed from the auth background, so nothing sits
-                    // behind these lines any more.
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            isLogin ? context.tr('no_account_prompt') : context.tr('have_account_prompt'),
-                            style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () => setState(() => isLogin = !isLogin),
-                          child: Text(
-                            isLogin ? context.tr('signup_btn') : context.tr('login_btn'),
-                            style: const TextStyle(color: DiwaliColors.purple, fontSize: 14, fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      context.tr('terms_privacy_notice'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: DiwaliColors.inkBlack, fontSize: 12, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 40),
+                    Icon(Icons.arrow_back_rounded, color: UiColors.plum, size: 18),
+                    SizedBox(width: 8),
+                    Text('Back To Sign Up', style: TextStyle(color: UiColors.plum, fontSize: 12.5, fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
+              const SizedBox(height: 18),
+            ],
+            Text(isLogin ? 'Login' : 'Sign Up',
+                style: const TextStyle(color: UiColors.plum, fontSize: 32, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 18),
+
+            TextFormField(
+              controller: _emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: _dec('Email', Icons.mail_outline_rounded),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return context.tr('enter_your_email_error');
+                if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) return context.tr('enter_valid_email_error');
+                return null;
+              },
             ),
-          ),
+            const SizedBox(height: 12),
+
+            TextFormField(
+              controller: _passwordCtrl,
+              obscureText: obscurePassword,
+              decoration: _dec('Password', Icons.lock_rounded,
+                  suffix: _eye(obscurePassword, () => setState(() => obscurePassword = !obscurePassword))),
+              validator: (v) => (v == null || v.length < 6) ? context.tr('password_min_length_error') : null,
+            ),
+
+            if (!isLogin) ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _confirmCtrl,
+                obscureText: obscureConfirm,
+                decoration: _dec('Confirm Password', Icons.lock_rounded,
+                    suffix: _eye(obscureConfirm, () => setState(() => obscureConfirm = !obscureConfirm))),
+                validator: (v) => v != _passwordCtrl.text ? 'Passwords do not match' : null,
+              ),
+              const SizedBox(height: 12),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => detailsCorrect = !detailsCorrect),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Checkbox(
+                        value: detailsCorrect,
+                        onChanged: (v) => setState(() => detailsCorrect = v ?? false),
+                        activeColor: UiColors.plum,
+                        side: const BorderSide(color: UiColors.plum, width: 1.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text('All details correct', style: TextStyle(color: _hintColor, fontSize: 13, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ],
+
+            if (isLogin)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _forgotPassword,
+                  style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4), minimumSize: const Size(0, 34)),
+                  child: const Text('Forgot Password', style: TextStyle(color: UiColors.plum, fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+              ),
+
+            SizedBox(height: isLogin ? 8 : 18),
+            AppAuthButton(
+              label: isLogin ? 'Login' : 'Sign Up',
+              loading: loading,
+              onPressed: _submitEmailAuth,
+            ),
+            if (slowServerHint != null) ...[
+              const SizedBox(height: 10),
+              Center(child: Text(slowServerHint!, style: const TextStyle(color: UiColors.textDim, fontSize: 12), textAlign: TextAlign.center)),
+            ],
+            const SizedBox(height: 14),
+            const Center(child: Text('Or login with', style: TextStyle(color: _hintColor, fontSize: 12, fontWeight: FontWeight.w700))),
+            const SizedBox(height: 12),
+            _googleButton(),
+            const SizedBox(height: 16),
+
+            Center(
+              child: GestureDetector(
+                onTap: _switchMode,
+                behavior: HitTestBehavior.opaque,
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(color: _hintColor, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    children: [
+                      TextSpan(text: isLogin ? "Don't have an account? " : 'Already have an account? '),
+                      TextSpan(
+                        text: isLogin ? 'Sign Up' : 'Login',
+                        style: const TextStyle(color: UiColors.plum, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (isLogin) ...[
+              const SizedBox(height: 18),
+              const Center(child: Text('Powered By Tube Pilot', style: TextStyle(color: _hintColor, fontSize: 11.5, fontWeight: FontWeight.w700))),
+            ],
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: UiColors.plum,
+        body: AuthHeaderBackground(
+          headerHeight: keyboardOpen ? 135 : 230,
+          showPlant: !isLogin && !keyboardOpen,
+          header: _header(),
+          sheet: _sheet(),
         ),
       ),
     );

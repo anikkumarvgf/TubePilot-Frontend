@@ -21,7 +21,9 @@ class PushService {
   static Future<void> initAfterLogin() async {
     try {
       final settings = await _messaging.requestPermission(
-        alert: true, badge: true, sound: true,
+        alert: true,
+        badge: true,
+        sound: true,
       );
       if (settings.authorizationStatus == AuthorizationStatus.denied) {
         return; // user declined notification permission — nothing more to do
@@ -34,7 +36,9 @@ class PushService {
 
       // If the token rotates later (rare, but happens), keep the backend in sync
       _messaging.onTokenRefresh.listen((newToken) {
-        ApiService.instance.registerDeviceToken(newToken).catchError((_) => <String, dynamic>{});
+        ApiService.instance
+            .registerDeviceToken(newToken)
+            .catchError((_) => <String, dynamic>{});
       });
 
       if (!_initialized) {
@@ -48,8 +52,9 @@ class PushService {
           final ctx = navigatorKey.currentContext;
           final title = message.notification?.title;
           final body = message.notification?.body;
-          if (ctx != null && title != null) {
-            showToast(ctx, body != null ? '$title — $body' : title, isSuccess: true);
+          if (ctx != null && ctx.mounted && title != null) {
+            showToast(ctx, body != null ? '$title — $body' : title,
+                isSuccess: true);
           }
           newNotificationSignal.value++;
         });
@@ -57,7 +62,8 @@ class PushService {
         // Background: app is alive but not in foreground, user taps the
         // system tray notification -> jump straight to Notifications.
         FirebaseMessaging.onMessageOpenedApp.listen((message) {
-          navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+          navigatorKey.currentState?.push(
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()));
         });
 
         // Terminated: app was fully closed, user taps the system tray
@@ -66,7 +72,8 @@ class PushService {
         final initialMessage = await _messaging.getInitialMessage();
         if (initialMessage != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+            navigatorKey.currentState?.push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()));
           });
         }
       }

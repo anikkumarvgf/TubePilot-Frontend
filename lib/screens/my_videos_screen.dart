@@ -59,13 +59,20 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
   }
 
   DateTime _dateOf(Map<String, dynamic> v) =>
-      DateTime.tryParse((v['publishedAt'] ?? v['createdAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      DateTime.tryParse(
+          (v['publishedAt'] ?? v['createdAt'] ?? '').toString()) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
 
-  num _viewsOf(Map<String, dynamic> v) => num.tryParse((v['viewCount'] ?? '').toString()) ?? -1;
+  num _viewsOf(Map<String, dynamic> v) =>
+      num.tryParse((v['viewCount'] ?? '').toString()) ?? -1;
 
   List<Map<String, dynamic>> get _shown {
     final q = _query.trim().toLowerCase();
-    final list = _videos.where((v) => q.isEmpty || (v['title'] ?? '').toString().toLowerCase().contains(q)).toList();
+    final list = _videos
+        .where((v) =>
+            q.isEmpty ||
+            (v['title'] ?? '').toString().toLowerCase().contains(q))
+        .toList();
     switch (_sort) {
       case _VidSort.newest:
         list.sort((a, b) => _dateOf(b).compareTo(_dateOf(a)));
@@ -89,14 +96,18 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (c) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 12),
           for (final e in labels.entries)
             ListTile(
-              title: Text(context.tr(e.value), style: const TextStyle(fontWeight: FontWeight.w600)),
-              trailing: _sort == e.key ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
+              title: Text(context.tr(e.value),
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              trailing: _sort == e.key
+                  ? const Icon(Icons.check_rounded, color: AppColors.purple)
+                  : null,
               onTap: () {
                 setState(() => _sort = e.key);
                 Navigator.pop(c);
@@ -125,7 +136,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
       final isPremiumActive = sub != null && sub['isActive'] == true;
       final diamondBalance = (dash?['diamondBalance'] ?? 0) as num;
       setState(() {
-        _videos = (results[0]['videos'] as List? ?? []).cast<Map<String, dynamic>>();
+        _videos =
+            (results[0]['videos'] as List? ?? []).cast<Map<String, dynamic>>();
         _aiEligible = isPremiumActive || diamondBalance > 0;
       });
       _maybeScrollToHighlighted();
@@ -165,25 +177,47 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
   }
 
   void _goToUpgrade() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()));
   }
 
   Future<void> _showCardMenu(Map<String, dynamic> item) async {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 4, margin: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999))),
-            ListTile(leading: const Icon(Icons.edit_outlined), title: Text(context.tr('myvideos_edit')), onTap: () => Navigator.pop(sheetContext, 'edit')),
+            Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                    color: context.surfaces.border,
+                    borderRadius: BorderRadius.circular(999))),
+            ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(context.tr('myvideos_edit')),
+                onTap: () => Navigator.pop(sheetContext, 'edit')),
             // ⚠️ NEW: purani video ko live karo (limits LiveOldVideosScreen check karti hai).
             // Key: 'myvideos_live' (live_strings_to_add.txt wale block mein).
-            ListTile(leading: const Icon(Icons.podcasts_rounded), title: Text(context.tr('myvideos_live')), onTap: () => Navigator.pop(sheetContext, 'live')),
-            ListTile(leading: const Icon(Icons.share_outlined), title: Text(context.tr('myvideos_share')), onTap: () => Navigator.pop(sheetContext, 'share')),
-            ListTile(leading: const Icon(Icons.delete_outline_rounded, color: AppColors.red), title: Text(context.tr('myvideos_delete'), style: const TextStyle(color: AppColors.red)), onTap: () => Navigator.pop(sheetContext, 'delete')),
+            ListTile(
+                leading: const Icon(Icons.podcasts_rounded),
+                title: Text(context.tr('myvideos_live')),
+                onTap: () => Navigator.pop(sheetContext, 'live')),
+            ListTile(
+                leading: const Icon(Icons.share_outlined),
+                title: Text(context.tr('myvideos_share')),
+                onTap: () => Navigator.pop(sheetContext, 'share')),
+            ListTile(
+                leading: const Icon(Icons.delete_outline_rounded,
+                    color: AppColors.red),
+                title: Text(context.tr('myvideos_delete'),
+                    style: const TextStyle(color: AppColors.red)),
+                onTap: () => Navigator.pop(sheetContext, 'delete')),
             const SizedBox(height: 8),
           ],
         ),
@@ -199,7 +233,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
 
   void _goLive(Map<String, dynamic> item) {
     if (item['dbId'] == null && item['ytVideoId'] == null) {
-      showToast(context, context.tr('live_toast_cannot_live_video'), isError: true);
+      showToast(context, context.tr('live_toast_cannot_live_video'),
+          isError: true);
       return;
     }
     Navigator.of(context).push(
@@ -210,11 +245,13 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
   void _shareVideo(Map<String, dynamic> item) {
     final videoId = item['ytVideoId'];
     if (videoId == null) {
-      showToast(context, context.tr('myvideos_share_unavailable'), isError: true);
+      showToast(context, context.tr('myvideos_share_unavailable'),
+          isError: true);
       return;
     }
     final shareUrl = '${AppConfig.shareBaseUrl}/v/$videoId';
-    Share.share('${item['title'] ?? ''}\n$shareUrl');
+    SharePlus.instance
+        .share(ShareParams(text: '${item['title'] ?? ''}\n$shareUrl'));
   }
 
   // ---------------- Delete (double confirmation, both DB + YouTube) ----------------
@@ -225,8 +262,13 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
         title: Text(context.tr('myvideos_delete_confirm_title')),
         content: Text(context.tr('myvideos_delete_confirm_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.tr('cancel'))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(context.tr('myvideos_delete'), style: const TextStyle(color: AppColors.red))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(context.tr('cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(context.tr('myvideos_delete'),
+                  style: const TextStyle(color: AppColors.red))),
         ],
       ),
     );
@@ -244,7 +286,9 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
         title: Text(context.tr('myvideos_delete_final_title')),
         content: Text(context.tr('myvideos_delete_final_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.tr('cancel'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(context.tr('cancel'))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -262,7 +306,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
         await ApiService.instance.deleteYoutubeOnlyVideo(item['ytVideoId']);
       }
       if (mounted) {
-        showToast(context, context.tr('myvideos_deleted_toast'), isSuccess: true);
+        showToast(context, context.tr('myvideos_deleted_toast'),
+            isSuccess: true);
         _load();
       }
     } catch (e) {
@@ -275,7 +320,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => _EditVideoSheet(
         item: item,
         aiEligible: _aiEligible,
@@ -338,7 +384,11 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              IconButton(onPressed: _openSort, tooltip: context.tr('sv_filter'), icon: const Icon(Icons.tune_rounded, color: AppColors.purple)),
+              IconButton(
+                  onPressed: _openSort,
+                  tooltip: context.tr('sv_filter'),
+                  icon:
+                      const Icon(Icons.tune_rounded, color: AppColors.purple)),
             ]),
           ),
         Expanded(
@@ -350,14 +400,18 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
                 : _videos.isEmpty
                     ? ListView(children: [
                         const SizedBox(height: 80),
-                        EmptyView(message: context.tr('myvideos_empty'), icon: Icons.video_library_outlined),
+                        EmptyView(
+                            message: context.tr('myvideos_empty'),
+                            icon: Icons.video_library_outlined),
                       ])
                     : Builder(builder: (_) {
                         final list = _shown;
                         if (list.isEmpty) {
                           return ListView(children: [
                             const SizedBox(height: 80),
-                            EmptyView(message: context.tr('sv_no_match'), icon: Icons.search_off_rounded),
+                            EmptyView(
+                                message: context.tr('sv_no_match'),
+                                icon: Icons.search_off_rounded),
                           ]);
                         }
                         return ListView.builder(
@@ -376,9 +430,11 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
   /// Returns '' when the server sent neither views nor a date, so nothing is shown.
   String _statsLine(Map<String, dynamic> item) {
     final views = num.tryParse((item['viewCount'] ?? '').toString());
-    final ago = timeAgo(context, (item['publishedAt'] ?? item['createdAt'])?.toString());
+    final ago = timeAgo(
+        context, (item['publishedAt'] ?? item['createdAt'])?.toString());
     return [
-      if (views != null) context.tr('sv_views').replaceAll('%1', fmtCount(views)),
+      if (views != null)
+        context.tr('sv_views').replaceAll('%1', fmtCount(views)),
       if (ago.isNotEmpty) ago,
     ].join('  ·  ');
   }
@@ -388,7 +444,9 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
     final id = _idOf(item);
     final isHighlighted = id != null && id == _highlightedId;
     final cardKey = id != null ? (_cardKeys[id] ??= GlobalKey()) : null;
-    final title = (item['title'] ?? '').toString().isNotEmpty ? item['title'].toString() : context.tr('apply_to_video_untitled');
+    final title = (item['title'] ?? '').toString().isNotEmpty
+        ? item['title'].toString()
+        : context.tr('apply_to_video_untitled');
     final stats = _statsLine(item);
 
     return AnimatedContainer(
@@ -403,7 +461,12 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: isHighlighted
-            ? [BoxShadow(color: AppColors.purple.withValues(alpha: 0.25), blurRadius: 12, spreadRadius: 1)]
+            ? [
+                BoxShadow(
+                    color: AppColors.purple.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    spreadRadius: 1)
+              ]
             : null,
       ),
       child: Row(
@@ -417,8 +480,14 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
                 width: 118,
                 height: 74,
                 child: thumb.isNotEmpty
-                    ? Image.network(thumb, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2, child: const Icon(Icons.movie_outlined, size: 26)))
-                    : Container(color: context.surfaces.card2, child: const Icon(Icons.movie_outlined, size: 26)),
+                    ? Image.network(thumb,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                            color: context.surfaces.card2,
+                            child: const Icon(Icons.movie_outlined, size: 26)))
+                    : Container(
+                        color: context.surfaces.card2,
+                        child: const Icon(Icons.movie_outlined, size: 26)),
               ),
             ),
           ),
@@ -436,7 +505,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
                       title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                     if (stats.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -444,7 +514,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
                         stats,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5),
+                        style: TextStyle(
+                            color: context.surfaces.textDim, fontSize: 11.5),
                       ),
                     ],
                   ],
@@ -456,7 +527,8 @@ class _MyVideosScreenState extends State<MyVideosScreen> {
             onTap: () => _showCardMenu(item),
             child: Padding(
               padding: const EdgeInsets.only(left: 4),
-              child: Icon(Icons.more_horiz_rounded, color: context.surfaces.textDim),
+              child: Icon(Icons.more_horiz_rounded,
+                  color: context.surfaces.textDim),
             ),
           ),
         ],
@@ -473,7 +545,11 @@ class _EditVideoSheet extends StatefulWidget {
   final bool aiEligible;
   final VoidCallback onNeedsUpgrade;
   final VoidCallback onSaved;
-  const _EditVideoSheet({required this.item, required this.aiEligible, required this.onNeedsUpgrade, required this.onSaved});
+  const _EditVideoSheet(
+      {required this.item,
+      required this.aiEligible,
+      required this.onNeedsUpgrade,
+      required this.onSaved});
 
   @override
   State<_EditVideoSheet> createState() => _EditVideoSheetState();
@@ -515,7 +591,9 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
       widget.onNeedsUpgrade();
       return;
     }
-    final topic = _titleCtrl.text.trim().isNotEmpty ? _titleCtrl.text.trim() : (widget.item['title'] ?? '').toString();
+    final topic = _titleCtrl.text.trim().isNotEmpty
+        ? _titleCtrl.text.trim()
+        : (widget.item['title'] ?? '').toString();
     if (topic.isEmpty) {
       showToast(context, context.tr('myvideos_ai_needs_topic'), isError: true);
       return;
@@ -531,7 +609,10 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
         final res = await ApiService.instance.aiTags(topic);
         setState(() => _tagsCtrl.text = (res['tags'] as List).join(', '));
       }
-      if (mounted) showToast(context, context.tr('up_ai_content_generated'), isSuccess: true);
+      if (mounted) {
+        showToast(context, context.tr('up_ai_content_generated'),
+            isSuccess: true);
+      }
     } catch (e) {
       if (mounted) showAiError(context, e);
     }
@@ -540,13 +621,19 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      final tagsList = _tagsCtrl.text.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+      final tagsList = _tagsCtrl.text
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
 
       if (_newThumbnail != null) {
         if (widget.item['ytVideoId'] != null) {
-          await ApiService.instance.updateYoutubeThumbnail(widget.item['ytVideoId'], _newThumbnail!.path);
+          await ApiService.instance.updateYoutubeThumbnail(
+              widget.item['ytVideoId'], _newThumbnail!.path);
         } else if (widget.item['dbId'] != null) {
-          await ApiService.instance.updateDbVideoThumbnail(widget.item['dbId'], _newThumbnail!.path);
+          await ApiService.instance
+              .updateDbVideoThumbnail(widget.item['dbId'], _newThumbnail!.path);
         }
       }
 
@@ -582,7 +669,8 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
   Widget _fieldLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),
-      child: Text(text, style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+      child: Text(text,
+          style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
     );
   }
 
@@ -596,14 +684,25 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome_rounded, size: 14, color: widget.aiEligible ? AppColors.purpleLight : context.surfaces.textDim),
+              Icon(Icons.auto_awesome_rounded,
+                  size: 14,
+                  color: widget.aiEligible
+                      ? AppColors.purpleLight
+                      : context.surfaces.textDim),
               const SizedBox(width: 4),
               // ⚠️ FIX: 'myvideos_ai_generate' key is now added to
               // app_strings.dart — reads from translations again.
-              Text(context.tr('myvideos_ai_generate'), style: TextStyle(color: widget.aiEligible ? AppColors.purpleLight : context.surfaces.textDim, fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(context.tr('myvideos_ai_generate'),
+                  style: TextStyle(
+                      color: widget.aiEligible
+                          ? AppColors.purpleLight
+                          : context.surfaces.textDim,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
               if (!widget.aiEligible) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.lock_rounded, size: 12, color: context.surfaces.textDim),
+                Icon(Icons.lock_rounded,
+                    size: 12, color: context.surfaces.textDim),
               ],
             ],
           ),
@@ -623,14 +722,23 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
       builder: (_, scrollController) => SafeArea(
         child: SingleChildScrollView(
           controller: scrollController,
-          padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+          padding: EdgeInsets.fromLTRB(
+              20, 12, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
-                child: Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(999))),
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                        color: context.surfaces.border,
+                        borderRadius: BorderRadius.circular(999))),
               ),
-              Text(context.tr('myvideos_edit_title'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              Text(context.tr('myvideos_edit_title'),
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w800)),
               const SizedBox(height: 14),
 
               // ---------------- Thumbnail ----------------
@@ -643,8 +751,14 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                     child: _newThumbnail != null
                         ? Image.file(_newThumbnail!, fit: BoxFit.cover)
                         : (currentThumb.isNotEmpty
-                            ? Image.network(currentThumb, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2))
-                            : Container(color: context.surfaces.card2, child: const Icon(Icons.image_outlined, size: 28))),
+                            ? Image.network(currentThumb,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    Container(color: context.surfaces.card2))
+                            : Container(
+                                color: context.surfaces.card2,
+                                child: const Icon(Icons.image_outlined,
+                                    size: 28))),
                   ),
                 ),
               ),
@@ -652,28 +766,45 @@ class _EditVideoSheetState extends State<_EditVideoSheet> {
                 padding: const EdgeInsets.only(top: 6),
                 // ⚠️ FIX: 'myvideos_change_thumbnail' key is now added to
                 // app_strings.dart — reads from translations again.
-                child: Text(context.tr('myvideos_change_thumbnail'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12)),
+                child: Text(context.tr('myvideos_change_thumbnail'),
+                    style: TextStyle(
+                        color: context.surfaces.textDim, fontSize: 12)),
               ),
 
               // ---- Title ----
               _fieldLabel(context.tr('up_title_label')),
-              TextField(controller: _titleCtrl, maxLength: 100, decoration: InputDecoration(hintText: context.tr('up_title_hint'))),
+              TextField(
+                  controller: _titleCtrl,
+                  maxLength: 100,
+                  decoration:
+                      InputDecoration(hintText: context.tr('up_title_hint'))),
               _aiGenerateRow('title'),
 
               // ---- Description ----
               _fieldLabel(context.tr('up_description_label')),
-              TextField(controller: _descCtrl, maxLines: 4, maxLength: 5000, decoration: InputDecoration(hintText: context.tr('up_description_hint'))),
+              TextField(
+                  controller: _descCtrl,
+                  maxLines: 4,
+                  maxLength: 5000,
+                  decoration: InputDecoration(
+                      hintText: context.tr('up_description_hint'))),
               _aiGenerateRow('description'),
 
               // ---- Tags ----
               _fieldLabel(context.tr('up_tags_label')),
-              TextField(controller: _tagsCtrl, decoration: InputDecoration(hintText: context.tr('up_tags_hint'))),
+              TextField(
+                  controller: _tagsCtrl,
+                  decoration:
+                      InputDecoration(hintText: context.tr('up_tags_hint'))),
               _aiGenerateRow('tags'),
 
               const SizedBox(height: 20),
               // ⚠️ FIX: 'save_btn' key is now added to app_strings.dart —
               // reads from translations again.
-              GradientButton(label: context.tr('save_btn'), loading: _saving, onPressed: _save),
+              GradientButton(
+                  label: context.tr('save_btn'),
+                  loading: _saving,
+                  onPressed: _save),
             ],
           ),
         ),

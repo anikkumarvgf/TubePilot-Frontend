@@ -54,20 +54,36 @@ class DiwaliBackground extends StatelessWidget {
   final Widget child;
   final bool decor;
   final bool festivalImage;
-  const DiwaliBackground({super.key, required this.child, this.decor = true, this.festivalImage = false});
+  const DiwaliBackground(
+      {super.key,
+      required this.child,
+      this.decor = true,
+      this.festivalImage = false});
 
   @override
   Widget build(BuildContext context) {
-    final asset = festivalImage ? context.watch<ThemeProvider>().festivalBackgroundAsset : null;
+    final asset = festivalImage
+        ? context.watch<ThemeProvider>().festivalBackgroundAsset
+        : null;
 
     return Stack(
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: DiwaliColors.creamTop),
-        if (!festivalImage) const Positioned.fill(child: CustomPaint(painter: _CreamRingsPainter())),
+        if (!festivalImage)
+          const Positioned.fill(
+              child: CustomPaint(painter: _CreamRingsPainter())),
         if (asset != null) ...[
-          Positioned(top: 0, left: 0, right: 0, child: _BgHalf(asset: asset, top: true)),
-          Positioned(bottom: 0, left: 0, right: 0, child: _BgHalf(asset: asset, top: false)),
+          Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _BgHalf(asset: asset, top: true)),
+          Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _BgHalf(asset: asset, top: false)),
         ],
         child,
       ],
@@ -85,7 +101,10 @@ class _CreamRingsPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..color = DiwaliColors.gold.withValues(alpha: 0.10);
-    for (final c in [Offset(size.width * 0.05, size.height * 0.42), Offset(size.width * 0.98, size.height * 0.66)]) {
+    for (final c in [
+      Offset(size.width * 0.05, size.height * 0.42),
+      Offset(size.width * 0.98, size.height * 0.66)
+    ]) {
       for (var r = 24.0; r <= 84; r += 20) {
         canvas.drawCircle(c, r, ring);
       }
@@ -164,9 +183,13 @@ class DiwaliCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.55), width: 1),
+          border: Border.all(
+              color: DiwaliColors.cardBorder.withValues(alpha: 0.55), width: 1),
           boxShadow: [
-            BoxShadow(color: DiwaliColors.purpleDark.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 5)),
+            BoxShadow(
+                color: DiwaliColors.purpleDark.withValues(alpha: 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 5)),
           ],
         ),
         child: Stack(
@@ -176,13 +199,16 @@ class DiwaliCard extends StatelessWidget {
               Positioned(
                 right: 6,
                 bottom: 4,
-                child: IgnorePointer(child: DiwaliSprig(width: sprigSize * 0.8, height: sprigSize)),
+                child: IgnorePointer(
+                    child:
+                        DiwaliSprig(width: sprigSize * 0.8, height: sprigSize)),
               ),
             if (star)
               const Positioned(
                 top: 6,
                 right: 9,
-                child: Text('\u2726', style: TextStyle(color: DiwaliColors.gold, fontSize: 9)),
+                child: Text('\u2726',
+                    style: TextStyle(color: DiwaliColors.gold, fontSize: 9)),
               ),
             Padding(padding: padding, child: child),
           ],
@@ -246,79 +272,82 @@ class DiwaliBottomNav extends StatelessWidget {
     return Material(
       type: MaterialType.transparency,
       child: SafeArea(
-      top: false,
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final w = c.maxWidth;
-          final s = w / _artW; // artwork px -> dp
-          final h = _artH * s * _zoom;
-          final tabW = 150 * s;
-          final top = 36 * s * _zoom;
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            final s = w / _artW; // artwork px -> dp
+            final h = _artH * s * _zoom;
+            final tabW = 150 * s;
+            final top = 36 * s * _zoom;
 
-          return SizedBox(
-            width: w,
-            height: h,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: Image.asset(
-                    'assets/nav_bg.png',
-                    fit: BoxFit.fill,
-                    gaplessPlayback: true,
-                    errorBuilder: (_, __, ___) => const ColoredBox(color: DiwaliColors.creamTop),
-                  ),
-                ),
-                for (var i = 0; i < 5; i++)
-                  Positioned(
-                    left: _centers[i] * s - tabW / 2,
-                    top: top,
-                    width: tabW,
-                    height: h - top,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => onTap(i),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          Icon(
-                            i == currentIndex ? _filled[i] : _outlined[i],
-                            size: 100 * s,
-                            color: DiwaliColors.purpleDeep,
-                          ),
-                          const SizedBox(height: 1),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              i < labels.length ? labels[i] : '',
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontSize: (42 * s).clamp(11.5, 14.5),
-                                height: 1.1,
-                                fontWeight: i == currentIndex ? FontWeight.w700 : FontWeight.w500,
-                                color: DiwaliColors.purpleDeep,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: i == currentIndex ? 56 * s : 0,
-                            height: (9 * s).clamp(3.0, 4.5),
-                            decoration: BoxDecoration(
-                              color: DiwaliColors.purpleDeep,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ],
-                      ),
+            return SizedBox(
+              width: w,
+              height: h,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/nav_bg.png',
+                      fit: BoxFit.fill,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, __, ___) =>
+                          const ColoredBox(color: DiwaliColors.creamTop),
                     ),
                   ),
-              ],
-            ),
-          );
-        },
-      ),
+                  for (var i = 0; i < 5; i++)
+                    Positioned(
+                      left: _centers[i] * s - tabW / 2,
+                      top: top,
+                      width: tabW,
+                      height: h - top,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onTap(i),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Icon(
+                              i == currentIndex ? _filled[i] : _outlined[i],
+                              size: 100 * s,
+                              color: DiwaliColors.purpleDeep,
+                            ),
+                            const SizedBox(height: 1),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                i < labels.length ? labels[i] : '',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: (42 * s).clamp(11.5, 14.5),
+                                  height: 1.1,
+                                  fontWeight: i == currentIndex
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: DiwaliColors.purpleDeep,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: i == currentIndex ? 56 * s : 0,
+                              height: (9 * s).clamp(3.0, 4.5),
+                              decoration: BoxDecoration(
+                                color: DiwaliColors.purpleDeep,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -333,7 +362,10 @@ class DiwaliDiya extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(width: width, height: width, child: CustomPaint(painter: _DiyaPainter()));
+    return SizedBox(
+        width: width,
+        height: width,
+        child: CustomPaint(painter: _DiyaPainter()));
   }
 }
 
@@ -341,11 +373,15 @@ class DiwaliSprig extends StatelessWidget {
   final double width;
   final double height;
   final bool mirrored;
-  const DiwaliSprig({super.key, this.width = 24, this.height = 30, this.mirrored = false});
+  const DiwaliSprig(
+      {super.key, this.width = 24, this.height = 30, this.mirrored = false});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(width: width, height: height, child: CustomPaint(painter: _SprigPainter(mirrored: mirrored)));
+    return SizedBox(
+        width: width,
+        height: height,
+        child: CustomPaint(painter: _SprigPainter(mirrored: mirrored)));
   }
 }
 
@@ -360,7 +396,10 @@ class DiwaliHangingDiyas extends StatelessWidget {
       height: 128 * scale,
       child: FittedBox(
         fit: BoxFit.fill,
-        child: const SizedBox(width: 64, height: 128, child: CustomPaint(painter: _HangingPainter())),
+        child: const SizedBox(
+            width: 64,
+            height: 128,
+            child: CustomPaint(painter: _HangingPainter())),
       ),
     );
   }
@@ -377,7 +416,10 @@ class DiwaliCornerDecor extends StatelessWidget {
       height: 80 * scale,
       child: FittedBox(
         fit: BoxFit.fill,
-        child: const SizedBox(width: 84, height: 80, child: CustomPaint(painter: _CornerPainter())),
+        child: const SizedBox(
+            width: 84,
+            height: 80,
+            child: CustomPaint(painter: _CornerPainter())),
       ),
     );
   }
@@ -389,7 +431,10 @@ class DiwaliSideFlowers extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(width: 46, height: 80, child: CustomPaint(painter: _SideFlowersPainter()));
+    return const SizedBox(
+        width: 46,
+        height: 80,
+        child: CustomPaint(painter: _SideFlowersPainter()));
   }
 }
 
@@ -440,7 +485,8 @@ void _drawDiya(Canvas canvas, Offset c, double w) {
 
   final bowl = Path()
     ..moveTo(c.dx - w / 2, c.dy)
-    ..cubicTo(c.dx - w * 0.46, c.dy + w * 0.42, c.dx + w * 0.46, c.dy + w * 0.42, c.dx + w / 2, c.dy)
+    ..cubicTo(c.dx - w * 0.46, c.dy + w * 0.42, c.dx + w * 0.46,
+        c.dy + w * 0.42, c.dx + w / 2, c.dy)
     ..close();
   canvas.drawPath(
     bowl,
@@ -458,11 +504,13 @@ void _drawDiya(Canvas canvas, Offset c, double w) {
       ..color = DiwaliColors.gold
       ..strokeWidth = 1,
   );
-  canvas.drawCircle(Offset(c.dx, c.dy + w * 0.14), w * 0.05, Paint()..color = DiwaliColors.goldLight);
+  canvas.drawCircle(Offset(c.dx, c.dy + w * 0.14), w * 0.05,
+      Paint()..color = DiwaliColors.goldLight);
 
   final rim = Rect.fromCenter(center: c, width: w, height: w * 0.2);
   canvas.drawOval(rim, Paint()..color = DiwaliColors.goldLight);
-  canvas.drawOval(rim.deflate(w * 0.04), Paint()..color = DiwaliColors.goldDeep.withValues(alpha: 0.75));
+  canvas.drawOval(rim.deflate(w * 0.04),
+      Paint()..color = DiwaliColors.goldDeep.withValues(alpha: 0.75));
 
   final flame = Path()
     ..moveTo(c.dx, c.dy - w * 0.8)
@@ -475,7 +523,8 @@ void _drawDiya(Canvas canvas, Offset c, double w) {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [Color(0xFFFFF6C2), Color(0xFFFFB030)],
-      ).createShader(Rect.fromLTWH(c.dx - w * 0.2, c.dy - w * 0.8, w * 0.4, w * 0.75)),
+      ).createShader(
+          Rect.fromLTWH(c.dx - w * 0.2, c.dy - w * 0.8, w * 0.4, w * 0.75)),
   );
 }
 
@@ -485,7 +534,10 @@ void _drawFlower(Canvas canvas, Offset c, double r, Color color) {
     canvas.save();
     canvas.translate(c.dx, c.dy);
     canvas.rotate(i * math.pi / 4);
-    canvas.drawOval(Rect.fromCenter(center: Offset(0, -r * 0.55), width: r * 0.7, height: r * 0.95), petal);
+    canvas.drawOval(
+        Rect.fromCenter(
+            center: Offset(0, -r * 0.55), width: r * 0.7, height: r * 0.95),
+        petal);
     canvas.restore();
   }
   canvas.drawCircle(c, r * 0.32, Paint()..color = const Color(0xFFD9741A));
@@ -494,7 +546,8 @@ void _drawFlower(Canvas canvas, Offset c, double r, Color color) {
 class _DiyaPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    _drawDiya(canvas, Offset(size.width / 2, size.height * 0.62), size.width * 0.9);
+    _drawDiya(
+        canvas, Offset(size.width / 2, size.height * 0.62), size.width * 0.9);
   }
 
   @override
@@ -512,7 +565,12 @@ class _HangingPainter extends CustomPainter {
     canvas.drawLine(const Offset(42, 0), const Offset(42, 60), string);
     canvas.drawLine(const Offset(16, 0), const Offset(16, 100), string);
     final star = Paint()..color = DiwaliColors.gold;
-    for (final p in const [Offset(42, 18), Offset(42, 34), Offset(16, 28), Offset(16, 50)]) {
+    for (final p in const [
+      Offset(42, 18),
+      Offset(42, 34),
+      Offset(16, 28),
+      Offset(16, 50)
+    ]) {
       canvas.drawCircle(p, 2.6, star);
     }
     _drawDiya(canvas, const Offset(42, 62), 34);
@@ -594,7 +652,8 @@ class _SprigPainter extends CustomPainter {
         canvas.translate(pos.dx, pos.dy);
         canvas.rotate(a + side * 0.8);
         final path = Path()
-          ..quadraticBezierTo(leafLen * scale * 0.5, -leafWid * scale, leafLen * scale, 0)
+          ..quadraticBezierTo(
+              leafLen * scale * 0.5, -leafWid * scale, leafLen * scale, 0)
           ..quadraticBezierTo(leafLen * scale * 0.5, leafWid * scale, 0, 0);
         canvas.drawPath(
           path,
@@ -606,13 +665,13 @@ class _SprigPainter extends CustomPainter {
         canvas.restore();
       }
     }
-    canvas.drawCircle(Offset(w * 0.12, h * 0.94), 1.8, Paint()..color = DiwaliColors.petal);
+    canvas.drawCircle(
+        Offset(w * 0.12, h * 0.94), 1.8, Paint()..color = DiwaliColors.petal);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
 
 // =============================================================================
 // AUTH / SPLASH ART — everything below is drawn in CODE (no image files).
@@ -630,7 +689,8 @@ enum DiwaliArt { auth, splash }
 class DiwaliAuthBackground extends StatelessWidget {
   final Widget child;
   final DiwaliArt art;
-  const DiwaliAuthBackground({super.key, required this.child, this.art = DiwaliArt.auth});
+  const DiwaliAuthBackground(
+      {super.key, required this.child, this.art = DiwaliArt.auth});
 
   @override
   Widget build(BuildContext context) {
@@ -649,12 +709,19 @@ class DiwaliAuthBackground extends StatelessWidget {
             ),
           ),
         ),
-        IgnorePointer(child: CustomPaint(painter: _AuthBgPainter(splash: art == DiwaliArt.splash))),
-        Positioned(top: 0, left: 0, child: IgnorePointer(child: DiwaliGarlands(scale: s))),
+        IgnorePointer(
+            child: CustomPaint(
+                painter: _AuthBgPainter(splash: art == DiwaliArt.splash))),
+        Positioned(
+            top: 0,
+            left: 0,
+            child: IgnorePointer(child: DiwaliGarlands(scale: s))),
         Positioned(
           top: 0,
           right: 0,
-          child: IgnorePointer(child: Transform.flip(flipX: true, child: DiwaliGarlands(scale: s))),
+          child: IgnorePointer(
+              child:
+                  Transform.flip(flipX: true, child: DiwaliGarlands(scale: s))),
         ),
         // UPDATED: the bottom diya / rangoli art is REMOVED on the auth screen
         // (it sat behind the "Already have an account?" and Terms lines).
@@ -678,7 +745,10 @@ class DiwaliGarlands extends StatelessWidget {
       height: 320 * scale,
       child: FittedBox(
         fit: BoxFit.fill,
-        child: const SizedBox(width: 120, height: 320, child: CustomPaint(painter: _GarlandsPainter())),
+        child: const SizedBox(
+            width: 120,
+            height: 320,
+            child: CustomPaint(painter: _GarlandsPainter())),
       ),
     );
   }
@@ -691,7 +761,10 @@ class DiwaliBigDiya extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(width: width, height: width * 0.58, child: const CustomPaint(painter: _BigDiyaPainter()));
+    return SizedBox(
+        width: width,
+        height: width * 0.58,
+        child: const CustomPaint(painter: _BigDiyaPainter()));
   }
 }
 
@@ -703,7 +776,10 @@ class DiwaliDiyaIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(width: size, height: size, child: CustomPaint(painter: _DiyaIconPainter(color)));
+    return SizedBox(
+        width: size,
+        height: size,
+        child: CustomPaint(painter: _DiyaIconPainter(color)));
   }
 }
 
@@ -713,7 +789,11 @@ class DiwaliAuthButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
-  const DiwaliAuthButton({super.key, required this.label, required this.onPressed, this.loading = false});
+  const DiwaliAuthButton(
+      {super.key,
+      required this.label,
+      required this.onPressed,
+      this.loading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -728,21 +808,36 @@ class DiwaliAuthButton extends StatelessWidget {
               height: 54,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [DiwaliColors.purple, DiwaliColors.purpleDark]),
+                gradient: const LinearGradient(
+                    colors: [DiwaliColors.purple, DiwaliColors.purpleDark]),
                 borderRadius: BorderRadius.circular(30),
                 border: Border.all(color: DiwaliColors.goldLight, width: 1.6),
-                boxShadow: [BoxShadow(color: DiwaliColors.purpleDark.withValues(alpha: 0.30), blurRadius: 12, offset: const Offset(0, 5))],
+                boxShadow: [
+                  BoxShadow(
+                      color: DiwaliColors.purpleDark.withValues(alpha: 0.30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5))
+                ],
               ),
               child: loading
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.4, color: Colors.white))
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const DiwaliDiyaIcon(size: 24),
                         const SizedBox(width: 12),
-                        Text(label, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800)),
+                        Text(label,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800)),
                         const SizedBox(width: 12),
-                        const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 22),
+                        const Icon(Icons.arrow_forward_rounded,
+                            color: Colors.white, size: 22),
                       ],
                     ),
             ),
@@ -782,14 +877,18 @@ class DiwaliLotusDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final line = Container(height: 1, color: DiwaliColors.purple.withValues(alpha: 0.55));
+    final line = Container(
+        height: 1, color: DiwaliColors.purple.withValues(alpha: 0.55));
     return SizedBox(
       width: width,
       child: Row(
         children: [
           Expanded(child: line),
           const SizedBox(width: 8),
-          const SizedBox(width: 26, height: 20, child: CustomPaint(painter: _LotusPainter())),
+          const SizedBox(
+              width: 26,
+              height: 20,
+              child: CustomPaint(painter: _LotusPainter())),
           const SizedBox(width: 8),
           Expanded(child: line),
         ],
@@ -835,19 +934,31 @@ class DiwaliSplashView extends StatelessWidget {
                       width: logo,
                       height: logo,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => Icon(Icons.play_circle_outline_rounded, size: logo * 0.8, color: DiwaliColors.purple),
+                      errorBuilder: (_, __, ___) => Icon(
+                          Icons.play_circle_outline_rounded,
+                          size: logo * 0.8,
+                          color: DiwaliColors.purple),
                     ),
                     const SizedBox(height: 8),
                     RichText(
                       text: const TextSpan(
-                        style: TextStyle(fontSize: 44, fontWeight: FontWeight.w800, letterSpacing: -1.2),
+                        style: TextStyle(
+                            fontSize: 44,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.2),
                         children: [
-                          TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF14091A))),
-                          TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
+                          TextSpan(
+                              text: 'Tube',
+                              style: TextStyle(color: Color(0xFF14091A))),
+                          TextSpan(
+                              text: 'Pilot',
+                              style: TextStyle(color: DiwaliColors.purple)),
                         ],
                       ),
                     ),
-                    const Text('Your YouTube Growth Partner', style: TextStyle(color: DiwaliColors.textDim, fontSize: 15)),
+                    const Text('Your YouTube Growth Partner',
+                        style: TextStyle(
+                            color: DiwaliColors.textDim, fontSize: 15)),
                   ],
                 ),
               ),
@@ -861,18 +972,30 @@ class DiwaliSplashView extends StatelessWidget {
                   children: [
                     const Text(
                       'H A P P Y',
-                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 14, letterSpacing: 3, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: DiwaliColors.purpleDark,
+                          fontSize: 14,
+                          letterSpacing: 3,
+                          fontWeight: FontWeight.w500),
                     ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const DiwaliSprig(width: 26, height: 32, mirrored: true),
+                        const DiwaliSprig(
+                            width: 26, height: 32, mirrored: true),
                         const SizedBox(width: 12),
                         ShaderMask(
-                          shaderCallback: (r) => const LinearGradient(colors: [DiwaliColors.purpleDark, DiwaliColors.purple]).createShader(r),
+                          shaderCallback: (r) => const LinearGradient(colors: [
+                            DiwaliColors.purpleDark,
+                            DiwaliColors.purple
+                          ]).createShader(r),
                           child: Text(
                             'Diwali',
-                            style: DiwaliColors.script.copyWith(color: Colors.white, fontSize: 58, fontWeight: FontWeight.w600, height: 1.05),
+                            style: DiwaliColors.script.copyWith(
+                                color: Colors.white,
+                                fontSize: 58,
+                                fontWeight: FontWeight.w600,
+                                height: 1.05),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -883,7 +1006,10 @@ class DiwaliSplashView extends StatelessWidget {
                     const Text(
                       'May your content shine brighter\nand your dreams grow bigger.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 15.5, height: 1.35),
+                      style: TextStyle(
+                          color: DiwaliColors.purpleDark,
+                          fontSize: 15.5,
+                          height: 1.35),
                     ),
                     const SizedBox(height: 8),
                     const DiwaliLotusDivider(width: 200),
@@ -891,13 +1017,20 @@ class DiwaliSplashView extends StatelessWidget {
                 ),
               ),
               // ---- side diyas + big diya + rangoli + flowers ----
-              Positioned(left: 14, bottom: h * 0.19, child: IgnorePointer(child: DiwaliDiya(width: 40))),
-              Positioned(right: 14, bottom: h * 0.19, child: IgnorePointer(child: DiwaliDiya(width: 40))),
+              Positioned(
+                  left: 14,
+                  bottom: h * 0.19,
+                  child: IgnorePointer(child: DiwaliDiya(width: 40))),
+              Positioned(
+                  right: 14,
+                  bottom: h * 0.19,
+                  child: IgnorePointer(child: DiwaliDiya(width: 40))),
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: h * 0.15,
-                child: IgnorePointer(child: Center(child: DiwaliBigDiya(width: diyaW))),
+                child: IgnorePointer(
+                    child: Center(child: DiwaliBigDiya(width: diyaW))),
               ),
               // ---- loader: clearly BELOW the rangoli (visible gap) ----
               Positioned(
@@ -910,10 +1043,13 @@ class DiwaliSplashView extends StatelessWidget {
                     SizedBox(
                       width: 28,
                       height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 3, color: DiwaliColors.purple),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 3, color: DiwaliColors.purple),
                     ),
                     SizedBox(height: 8),
-                    Text('Loading Your Creative Journey…', style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 13.5)),
+                    Text('Loading Your Creative Journey…',
+                        style: TextStyle(
+                            color: DiwaliColors.purpleDark, fontSize: 13.5)),
                   ],
                 ),
               ),
@@ -998,7 +1134,9 @@ class _AuthBgPainter extends CustomPainter {
       canvas.save();
       canvas.translate(mc.dx, mc.dy);
       canvas.rotate(i * math.pi / 6);
-      canvas.drawOval(Rect.fromCenter(center: const Offset(0, -112), width: 34, height: 66), ring);
+      canvas.drawOval(
+          Rect.fromCenter(center: const Offset(0, -112), width: 34, height: 66),
+          ring);
       canvas.restore();
     }
 
@@ -1014,29 +1152,35 @@ class _AuthBgPainter extends CustomPainter {
         canvas.translate(w, 0);
         canvas.scale(-1, 1);
       }
-      final top = splash ? Path() : (Path()
-        ..moveTo(0, 0)
-        ..lineTo(w * 0.36, 0)
-        ..quadraticBezierTo(w * 0.12, h * 0.025, 0, h * 0.085)
-        ..close());
-      if (!splash) canvas.drawPath(
-        top,
-        Paint()
-          ..shader = const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [DiwaliColors.purple, DiwaliColors.purpleDark],
-          ).createShader(Rect.fromLTWH(0, 0, w * 0.36, h * 0.09)),
-      );
-      if (!splash) canvas.drawPath(
-        Path()
-          ..moveTo(w * 0.36, 0)
-          ..quadraticBezierTo(w * 0.13, h * 0.03, 0, h * 0.095),
-        Paint()
-          ..color = DiwaliColors.gold
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4,
-      );
+      final top = splash
+          ? Path()
+          : (Path()
+            ..moveTo(0, 0)
+            ..lineTo(w * 0.36, 0)
+            ..quadraticBezierTo(w * 0.12, h * 0.025, 0, h * 0.085)
+            ..close());
+      if (!splash) {
+        canvas.drawPath(
+          top,
+          Paint()
+            ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [DiwaliColors.purple, DiwaliColors.purpleDark],
+            ).createShader(Rect.fromLTWH(0, 0, w * 0.36, h * 0.09)),
+        );
+      }
+      if (!splash) {
+        canvas.drawPath(
+          Path()
+            ..moveTo(w * 0.36, 0)
+            ..quadraticBezierTo(w * 0.13, h * 0.03, 0, h * 0.095),
+          Paint()
+            ..color = DiwaliColors.gold
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.4,
+        );
+      }
       final bottom = Path()
         ..moveTo(0, h)
         ..lineTo(0, h * 0.955)
@@ -1143,7 +1287,8 @@ class _BigDiyaPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2
       ..color = DiwaliColors.gold.withValues(alpha: 0.85);
-    canvas.drawCircle(Offset.zero, r, Paint()..color = const Color(0xFFF6EAF8).withValues(alpha: 0.9));
+    canvas.drawCircle(Offset.zero, r,
+        Paint()..color = const Color(0xFFF6EAF8).withValues(alpha: 0.9));
     canvas.drawCircle(Offset.zero, r, goldRing);
     const n = 16;
     for (var i = 0; i < n; i++) {
@@ -1155,19 +1300,27 @@ class _BigDiyaPainter extends CustomPainter {
         ..quadraticBezierTo(-r * 0.17, r * 0.62, 0, r * 0.28);
       canvas.drawPath(
         petal,
-        Paint()..color = (i.isEven ? const Color(0xFFB45BC4) : const Color(0xFFE58AC0)).withValues(alpha: 0.88),
+        Paint()
+          ..color =
+              (i.isEven ? const Color(0xFFB45BC4) : const Color(0xFFE58AC0))
+                  .withValues(alpha: 0.88),
       );
       canvas.restore();
     }
-    canvas.drawCircle(Offset.zero, r * 0.27, Paint()..color = DiwaliColors.goldLight.withValues(alpha: 0.95));
+    canvas.drawCircle(Offset.zero, r * 0.27,
+        Paint()..color = DiwaliColors.goldLight.withValues(alpha: 0.95));
     canvas.drawCircle(Offset.zero, r * 0.27, goldRing);
     canvas.restore();
 
     // marigolds on both sides
-    _drawFlower(canvas, Offset(w * 0.07, h * 0.80), w * 0.075, const Color(0xFFF28C1B));
-    _drawFlower(canvas, Offset(w * 0.16, h * 0.64), w * 0.058, const Color(0xFFFFB81F));
-    _drawFlower(canvas, Offset(w * 0.93, h * 0.80), w * 0.075, const Color(0xFFF28C1B));
-    _drawFlower(canvas, Offset(w * 0.84, h * 0.64), w * 0.058, const Color(0xFFFFB81F));
+    _drawFlower(
+        canvas, Offset(w * 0.07, h * 0.80), w * 0.075, const Color(0xFFF28C1B));
+    _drawFlower(
+        canvas, Offset(w * 0.16, h * 0.64), w * 0.058, const Color(0xFFFFB81F));
+    _drawFlower(
+        canvas, Offset(w * 0.93, h * 0.80), w * 0.075, const Color(0xFFF28C1B));
+    _drawFlower(
+        canvas, Offset(w * 0.84, h * 0.64), w * 0.058, const Color(0xFFFFB81F));
 
     // the diya
     _drawDiya(canvas, Offset(w * 0.5, h * 0.52), w * 0.56);

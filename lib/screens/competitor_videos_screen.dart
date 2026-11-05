@@ -84,7 +84,7 @@ class _CompetitorVideosScreenState extends State<CompetitorVideosScreen> {
     return AppBrandBackground(
       watermarkWhenNormal: false,
       child: Scaffold(
-        // transparent so the Diwali background shows through (opaque Scaffold hid it)
+        // transparent so the page background shows through (opaque Scaffold hid it)
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.transparent,

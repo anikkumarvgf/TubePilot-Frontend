@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cferrorresponse/cferrorresponse.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cfpaymentgateway/cfpaymentgatewayservice.dart';
 import 'package:flutter_cashfree_pg_sdk/api/cfsession/cfsession.dart';
@@ -11,7 +12,8 @@ import '../services/api_service.dart';
 /// status: 'approved' | 'rejected' | 'pending' | 'error' | 'no_callback'
 class CashfreeResult {
   final String status;
-  final String message; // real reason (Cashfree SDK / backend text), safe to show
+  final String
+      message; // real reason (Cashfree SDK / backend text), safe to show
   const CashfreeResult(this.status, [this.message = '']);
   bool get approved => status == 'approved';
 }
@@ -34,6 +36,10 @@ class CashfreeCheckout {
   final CFPaymentGatewayService _service = CFPaymentGatewayService();
   static const _callbackTimeout = Duration(seconds: 120);
 
+  void _log(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
+
   Future<CashfreeResult> pay(int diamonds) async {
     String orderId;
     String sessionId;
@@ -42,13 +48,17 @@ class CashfreeCheckout {
       final res = await ApiService.instance.createCashfreeOrder(diamonds);
       orderId = (res['orderId'] ?? '').toString();
       sessionId = (res['paymentSessionId'] ?? '').toString().trim();
-      env = (res['cashfreeEnvironment'] ?? '').toString().toUpperCase() == 'SANDBOX' ? CFEnvironment.SANDBOX : CFEnvironment.PRODUCTION;
+      env = (res['cashfreeEnvironment'] ?? '').toString().toUpperCase() ==
+              'SANDBOX'
+          ? CFEnvironment.SANDBOX
+          : CFEnvironment.PRODUCTION;
       if (orderId.isEmpty || sessionId.isEmpty) {
-        return const CashfreeResult('error', 'Server did not return a payment session. Backend response: $res');
+        return CashfreeResult('error',
+            'Server did not return a payment session. Backend response: $res');
       }
-      print('[Cashfree] Order created: orderId=$orderId env=$env sessionLen=${sessionId.length}');
+      _log('[Cashfree] Order created: orderId=$orderId env=$env');
     } catch (e) {
-      print('[Cashfree] create-order failed: $e');
+      _log('[Cashfree] create-order failed: $e');
       return CashfreeResult('error', e.toString());
     }
 
@@ -57,14 +67,17 @@ class CashfreeCheckout {
     // 1) callbacks FIRST - before doPayment
     _service.setCallback(
       (String verifiedOrderId) async {
-        print('[Cashfree] onVerify success: $verifiedOrderId');
+        _log('[Cashfree] onVerify success');
         if (!done.isCompleted) done.complete(await _confirm(verifiedOrderId));
       },
       (CFErrorResponse err, String failedOrderId) async {
-        final reason = [err.getMessage(), err.getCode(), err.getType(), err.getStatus()]
-            .where((e) => (e ?? '').toString().isNotEmpty)
-            .join(' | ');
-        print('[Cashfree] onError for $failedOrderId: $reason');
+        final reason = [
+          err.getMessage(),
+          err.getCode(),
+          err.getType(),
+          err.getStatus()
+        ].where((e) => (e ?? '').toString().isNotEmpty).join(' | ');
+        _log('[Cashfree] onError: $reason');
         // The payment may still have gone through - ask the backend before reporting failure.
         final r = await _confirm(failedOrderId, sdkError: reason);
         if (!done.isCompleted) done.complete(r);
@@ -78,29 +91,28 @@ class CashfreeCheckout {
           .setOrderId(orderId)
           .setPaymentSessionId(sessionId)
           .build();
-      
+
       // ✅ MAIN FIX: CFWebCheckoutPaymentBuilder instead of CFDropCheckoutPaymentBuilder
       // Drop causes INVALID_WEB_DATA and instant close (0.0 sec)
-      final payment = CFWebCheckoutPaymentBuilder()
-          .setSession(session)
-          .build();
-      
-      print('[Cashfree] Opening CFWebCheckoutPayment for $orderId');
+      final payment = CFWebCheckoutPaymentBuilder().setSession(session).build();
+
+      _log('[Cashfree] Opening CFWebCheckoutPayment');
       _service.doPayment(payment);
     } on CFException catch (e) {
-      print('[Cashfree] CFException opening checkout: ${e.message}');
-      return CashfreeResult('error', e.message ?? 'Could not open checkout.');
+      _log('[Cashfree] CFException opening checkout: ${e.message}');
+      return CashfreeResult('error', e.message);
     } catch (e) {
-      print('[Cashfree] Exception opening checkout: $e');
+      _log('[Cashfree] Exception opening checkout: $e');
       return CashfreeResult('error', e.toString());
     }
 
     return done.future.timeout(_callbackTimeout, onTimeout: () async {
-      print('[Cashfree] Timeout - no callback in ${_callbackTimeout.inSeconds}s');
+      _log('[Cashfree] Timeout waiting for payment callback');
       // No callback at all: still check the real status once.
       final r = await _confirm(orderId);
-      return r.status == 'pending' 
-          ? const CashfreeResult('no_callback', 'Checkout closed without a response. If money was deducted, diamonds will be added automatically.') 
+      return r.status == 'pending'
+          ? const CashfreeResult('no_callback',
+              'Checkout closed without a response. If money was deducted, diamonds will be added automatically.')
           : r;
     });
   }
@@ -108,17 +120,23 @@ class CashfreeCheckout {
   Future<CashfreeResult> _confirm(String orderId, {String? sdkError}) async {
     try {
       for (var i = 0; i < 6; i++) {
-        print('[Cashfree] Verifying $orderId attempt ${i+1}/6');
+        _log('[Cashfree] Verifying payment attempt ${i + 1}/6');
         final res = await ApiService.instance.verifyCashfreePayment(orderId);
         final status = (res['status'] ?? '').toString();
-        print('[Cashfree] Verify response: status=$status');
+        _log('[Cashfree] Verify response: status=$status');
         if (status == 'approved') return const CashfreeResult('approved');
-        if (status == 'rejected') return CashfreeResult('rejected', sdkError ?? 'Payment was not completed.');
+        if (status == 'rejected') {
+          return CashfreeResult(
+              'rejected', sdkError ?? 'Payment was not completed.');
+        }
         await Future.delayed(const Duration(seconds: 3));
       }
-      return CashfreeResult('pending', sdkError ?? 'Payment is still being confirmed. Diamonds will be added automatically once it succeeds.');
+      return CashfreeResult(
+          'pending',
+          sdkError ??
+              'Payment is still being confirmed. Diamonds will be added automatically once it succeeds.');
     } catch (e) {
-      print('[Cashfree] Confirm error: $e');
+      _log('[Cashfree] Confirm error: $e');
       return CashfreeResult('error', sdkError ?? e.toString());
     }
   }

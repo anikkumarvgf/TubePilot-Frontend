@@ -36,7 +36,8 @@ class LiveCameraScreen extends StatefulWidget {
 
 enum _CamStage { loading, error, ready, starting, live }
 
-class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBindingObserver {
+class _LiveCameraScreenState extends State<LiveCameraScreen>
+    with WidgetsBindingObserver {
   ApiVideoLiveStreamController? _controller;
   final TextEditingController _titleCtrl = TextEditingController();
 
@@ -58,18 +59,19 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
   final GlobalKey _previewKey = GlobalKey();
   Widget? _cameraView;
   int _ytMisses = 0;
-  String? _lastKey;            // auto-restart ke liye
+  String? _lastKey; // auto-restart ke liye
   String? _lastUrl;
   int _restarts = 0;
   bool _restarting = false;
 
   // YouTube connection ki asli sthiti
-  bool _trying = false;        // connect/fallback chal raha hai — callbacks se session band mat karo
-  bool _ytActive = false;      // YouTube ko data mil raha hai
+  bool _trying =
+      false; // connect/fallback chal raha hai — callbacks se session band mat karo
+  bool _ytActive = false; // YouTube ko data mil raha hai
   bool _polling = false;
-  String? _rtmpError;          // library ka last error (callback se)
-  String _connectInfo = '';    // user ko dikhane wala status / chala hua URL
-  String? _ytHealth;           // YouTube stream health (good/ok/bad/noData)
+  String? _rtmpError; // library ka last error (callback se)
+  String _connectInfo = ''; // user ko dikhane wala status / chala hua URL
+  String? _ytHealth; // YouTube stream health (good/ok/bad/noData)
 
   bool get _blocked => !_limits.canStart;
 
@@ -94,7 +96,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
     // App kill/screen destroy hone par bhi server session chhodna nahi hai.
     final id = _streamId;
     if (id != null && !_stopping) {
-      ApiService.instance.stopLiveStream(id).catchError((_) => <String, dynamic>{});
+      ApiService.instance
+          .stopLiveStream(id)
+          .catchError((_) => <String, dynamic>{});
     }
     LiveCameraScreen.active = false;
     WakelockPlus.disable();
@@ -131,7 +135,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       _secondsElapsed++;
       changed = true;
       if (_secondsElapsed % 10 == 0) _pollYoutube();
-      if (_secondsAllowed > 0 && _secondsElapsed >= _secondsAllowed) autoEnded = true;
+      if (_secondsAllowed > 0 && _secondsElapsed >= _secondsAllowed) {
+        autoEnded = true;
+      }
     }
     if (_waitSeconds > 0) {
       _waitSeconds--;
@@ -146,7 +152,8 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
 
   Future<void> _refreshLimits() async {
     try {
-      final res = await ApiService.instance.startLiveStream(videoUrl: LiveLimits.checkToken, title: null);
+      final res = await ApiService.instance
+          .startLiveStream(videoUrl: LiveLimits.checkToken, title: null);
       final limits = LiveLimits.fromJson(Map<String, dynamic>.from(res as Map));
       if (!mounted) return;
       setState(() {
@@ -186,21 +193,30 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
           resolution: Resolution.RESOLUTION_480,
           fps: 30,
         ),
-        onConnectionSuccess: () => debugPrint('[CameraLive] RTMP connection success'),
+        onConnectionSuccess: () =>
+            debugPrint('[CameraLive] RTMP connection success'),
         onConnectionFailed: (String error) {
           debugPrint('[CameraLive] RTMP connection failed: $error');
           _rtmpError = error;
-          if (!_trying) _handleConnectionProblem(_t('live_cam_connect_failed').replaceAll('%1', error));
+          if (!_trying) {
+            _handleConnectionProblem(
+                _t('live_cam_connect_failed').replaceAll('%1', error));
+          }
         },
         onDisconnection: () {
           debugPrint('[CameraLive] RTMP disconnected');
-          if (_trying) return; // fallback mein hum khud stopStreaming bulate hain
+          if (_trying) {
+            return; // fallback mein hum khud stopStreaming bulate hain
+          }
           _handleConnectionProblem(_t('live_cam_conn_lost'));
         },
         onError: (Exception e) {
           debugPrint('[CameraLive] error: $e');
           _rtmpError = e.toString();
-          if (!_trying) _handleConnectionProblem(_t('live_cam_error').replaceAll('%1', '$e'));
+          if (!_trying) {
+            _handleConnectionProblem(
+                _t('live_cam_error').replaceAll('%1', '$e'));
+          }
         },
       );
       await controller.initialize();
@@ -210,7 +226,8 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       }
       setState(() {
         _controller = controller;
-        _cameraView = ApiVideoCameraPreview(key: _previewKey, controller: controller, fit: BoxFit.cover);
+        _cameraView = ApiVideoCameraPreview(
+            key: _previewKey, controller: controller, fit: BoxFit.cover);
         _stage = _CamStage.ready;
       });
     } catch (e) {
@@ -237,7 +254,8 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
     String? createdStreamId;
     try {
       final title = _titleCtrl.text.trim();
-      final res = await ApiService.instance.startCameraLive(title: title.isEmpty ? null : title);
+      final res = await ApiService.instance
+          .startCameraLive(title: title.isEmpty ? null : title);
 
       createdStreamId = res['streamId']?.toString();
       final rtmpUrl = res['rtmpUrl']?.toString();
@@ -246,7 +264,8 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       if (createdStreamId == null || rtmpUrl == null || streamKey == null) {
         throw ApiException(_t('live_cam_no_details'));
       }
-      _streamId = createdStreamId; // ab se koi bhi band-karne wala raasta server session bhi band karega
+      _streamId =
+          createdStreamId; // ab se koi bhi band-karne wala raasta server session bhi band karega
       LiveCameraScreen.active = true;
 
       final usedUrl = await _connectToYouTube(
@@ -279,7 +298,11 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         _connectInfo = usedUrl;
         _stage = _CamStage.live;
       });
-      showToast(context, context.tr(_isFreeTrial ? 'live_cam_trial_started' : 'live_cam_started'), isSuccess: true);
+      showToast(
+          context,
+          context
+              .tr(_isFreeTrial ? 'live_cam_trial_started' : 'live_cam_started'),
+          isSuccess: true);
       _refreshLimits();
     } catch (e) {
       // Server par session ban chuka ho to release karo (kabhi live nahi hua to slot wapas milta hai).
@@ -325,7 +348,11 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       for (var i = 0; i < candidates.length; i++) {
         final url = candidates[i];
         _rtmpError = null;
-        if (mounted) setState(() => _connectInfo = _t('live_cam_connecting').replaceAll('%1', '${i + 1}').replaceAll('%2', '${candidates.length}'));
+        if (mounted) {
+          setState(() => _connectInfo = _t('live_cam_connecting')
+              .replaceAll('%1', '${i + 1}')
+              .replaceAll('%2', '${candidates.length}'));
+        }
         debugPrint('[CameraLive] try $url');
 
         try {
@@ -401,7 +428,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
     final c = _controller;
     final key = _lastKey;
     final url = _lastUrl;
-    if (_restarting || _stopping || c == null || key == null || url == null) return;
+    if (_restarting || _stopping || c == null || key == null || url == null) {
+      return;
+    }
     if (_restarts >= 3) return;
     _restarting = true;
     _restarts++;
@@ -457,7 +486,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       _connectInfo = '';
       _stopping = false;
     });
-    if (message != null) showToast(context, message, isError: isError, isSuccess: !isError);
+    if (message != null) {
+      showToast(context, message, isError: isError, isSuccess: !isError);
+    }
     _refreshLimits();
   }
 
@@ -468,10 +499,13 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         title: Text(ctx.tr('live_cam_stop_title')),
         content: Text(ctx.tr('live_cam_stop_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(ctx.tr('live_cam_no'))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.tr('live_cam_no'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(ctx.tr('live_cam_stop_confirm'), style: const TextStyle(color: AppColors.red)),
+            child: Text(ctx.tr('live_cam_stop_confirm'),
+                style: const TextStyle(color: AppColors.red)),
           ),
         ],
       ),
@@ -483,7 +517,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
     try {
       await _controller?.switchCamera();
     } catch (e) {
-      if (mounted) showToast(context, context.tr('live_cam_switch_failed'), isError: true);
+      if (mounted) {
+        showToast(context, context.tr('live_cam_switch_failed'), isError: true);
+      }
     }
   }
 
@@ -506,11 +542,14 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       canPop: !busy,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (_stage == _CamStage.starting) return; // start ke beech mein bahar nahi
+        if (_stage == _CamStage.starting) {
+          return; // start ke beech mein bahar nahi
+        }
         final stop = await _confirmStop();
         if (!stop) return;
+        if (!context.mounted) return;
         await _endSession(message: _t('live_cam_stopped'));
-        if (mounted) Navigator.of(context).pop();
+        if (context.mounted) Navigator.of(context).pop();
       },
       // Festival background wrapper — festival mode on ho to Diwali image,
       // off ho to koi extra background nahi.
@@ -544,9 +583,12 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.videocam_off_rounded, size: 44, color: context.surfaces.textDim),
+            Icon(Icons.videocam_off_rounded,
+                size: 44, color: context.surfaces.textDim),
             const SizedBox(height: 12),
-            Text(_errorText, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(_errorText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 18),
             if (_permanentlyDenied)
               ElevatedButton.icon(
@@ -575,7 +617,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         fit: StackFit.expand,
         children: [
           Container(color: Colors.black),
-          _cameraView ?? ApiVideoCameraPreview(key: _previewKey, controller: c, fit: BoxFit.cover),
+          _cameraView ??
+              ApiVideoCameraPreview(
+                  key: _previewKey, controller: c, fit: BoxFit.cover),
           overlay,
         ],
       ),
@@ -610,11 +654,14 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              live ? const SizedBox(height: 0) : LiveLimitBanner(limits: _limits, waitSeconds: _waitSeconds),
+              live
+                  ? const SizedBox(height: 0)
+                  : LiveLimitBanner(limits: _limits, waitSeconds: _waitSeconds),
               SizedBox(height: live ? 0 : 14),
               AspectRatio(
                 aspectRatio: 3 / 4,
-                child: _preview(overlay: live ? _liveOverlay() : _readyOverlay()),
+                child:
+                    _preview(overlay: live ? _liveOverlay() : _readyOverlay()),
               ),
               const SizedBox(height: 14),
               if (!live) ..._readyExtras(starting),
@@ -647,7 +694,11 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
       if (starting && _connectInfo.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Text(_connectInfo, style: const TextStyle(color: AppColors.purple, fontSize: 12.5, fontWeight: FontWeight.w600)),
+          child: Text(_connectInfo,
+              style: const TextStyle(
+                  color: AppColors.purple,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600)),
         ),
       Text(
         context.tr('live_cam_note'),
@@ -668,9 +719,14 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         child: ElevatedButton.icon(
           onPressed: (starting || _blocked) ? null : _goLive,
           icon: starting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.podcasts_rounded, size: 18),
-          label: Text(context.tr(starting ? 'live_btn_starting' : 'live_btn_go_live')),
+          label: Text(
+              context.tr(starting ? 'live_btn_starting' : 'live_btn_go_live')),
         ),
       ),
     );
@@ -678,62 +734,74 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
 
   Widget _liveOverlay() {
     return Stack(
-        children: [
-          Positioned(
-            top: 10,
-            left: 10,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(color: _ytActive ? Colors.redAccent : Colors.orange, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _ytActive ? 'LIVE  ${formatCountdown(_secondsElapsed)}' : context.tr('live_cam_no_data_badge'),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 10,
-            right: 10,
-            child: Column(
+      children: [
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(999)),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _roundButton(Icons.cameraswitch_rounded, _switchCamera),
-                if (!_ytActive) ...[
-                  const SizedBox(height: 8),
-                  _roundButton(Icons.refresh_rounded, () {
-                    _restarts = 0;
-                    _restartStreaming();
-                  }, color: Colors.orangeAccent),
-                ],
-                const SizedBox(height: 8),
-                _roundButton(_muted ? Icons.mic_off_rounded : Icons.mic_rounded, _toggleMute,
-                    color: _muted ? Colors.redAccent : Colors.white),
-                if (_watchUrl != null) ...[
-                  const SizedBox(height: 8),
-                  _roundButton(
-                    Icons.open_in_new_rounded,
-                    () => launchUrl(Uri.parse(_watchUrl!), mode: LaunchMode.externalApplication),
-                  ),
-                ],
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                      color: _ytActive ? Colors.redAccent : Colors.orange,
+                      shape: BoxShape.circle),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _ytActive
+                      ? 'LIVE  ${formatCountdown(_secondsElapsed)}'
+                      : context.tr('live_cam_no_data_badge'),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5),
+                ),
               ],
             ),
           ),
-        ],
-      );
+        ),
+        Positioned(
+          top: 10,
+          right: 10,
+          child: Column(
+            children: [
+              _roundButton(Icons.cameraswitch_rounded, _switchCamera),
+              if (!_ytActive) ...[
+                const SizedBox(height: 8),
+                _roundButton(Icons.refresh_rounded, () {
+                  _restarts = 0;
+                  _restartStreaming();
+                }, color: Colors.orangeAccent),
+              ],
+              const SizedBox(height: 8),
+              _roundButton(_muted ? Icons.mic_off_rounded : Icons.mic_rounded,
+                  _toggleMute,
+                  color: _muted ? Colors.redAccent : Colors.white),
+              if (_watchUrl != null) ...[
+                const SizedBox(height: 8),
+                _roundButton(
+                  Icons.open_in_new_rounded,
+                  () => launchUrl(Uri.parse(_watchUrl!),
+                      mode: LaunchMode.externalApplication),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _liveBottomBar() {
-    final remaining = (_secondsAllowed - _secondsElapsed).clamp(0, _secondsAllowed);
+    final remaining =
+        (_secondsAllowed - _secondsElapsed).clamp(0, _secondsAllowed);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
       decoration: BoxDecoration(
@@ -744,17 +812,27 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            context.tr('live_remaining').replaceAll('%1', formatCountdown(remaining)) +
+            context
+                    .tr('live_remaining')
+                    .replaceAll('%1', formatCountdown(remaining)) +
                 (_isFreeTrial ? context.tr('live_free_trial_suffix') : '') +
-                (_waitSeconds > 0 ? context.tr('live_cam_next_short').replaceAll('%1', formatCountdown(_waitSeconds)) : ''),
+                (_waitSeconds > 0
+                    ? context
+                        .tr('live_cam_next_short')
+                        .replaceAll('%1', formatCountdown(_waitSeconds))
+                    : ''),
             style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
           ),
           if (_ytHealth != null || _connectInfo.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                context.tr('live_cam_health').replaceAll('%1', _ytHealth ?? '-').replaceAll('%2', _connectInfo),
-                style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5),
+                context
+                    .tr('live_cam_health')
+                    .replaceAll('%1', _ytHealth ?? '-')
+                    .replaceAll('%2', _connectInfo),
+                style:
+                    TextStyle(color: context.surfaces.textDim, fontSize: 10.5),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -764,7 +842,9 @@ class _LiveCameraScreenState extends State<LiveCameraScreen> with WidgetsBinding
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.red),
-              onPressed: _stopping ? null : () => _endSession(message: _t('live_cam_stopped')),
+              onPressed: _stopping
+                  ? null
+                  : () => _endSession(message: _t('live_cam_stopped')),
               icon: const Icon(Icons.stop_circle_rounded, size: 18),
               label: Text(context.tr('live_cam_btn_stop')),
             ),

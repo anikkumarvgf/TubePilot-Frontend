@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart' as custom_tabs;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
@@ -10,15 +11,13 @@ import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
-// Painted cream background (no image) + clean white cards + diya bottom nav (shared decor)
-import '../widgets/diwali_decor.dart';
+// Clean background + white cards (shared decor)
+import '../widgets/app_decor.dart';
 import '../widgets/app_nav.dart';
-// Diwali welcome popup + shared popup shell
-import '../widgets/diwali_popups.dart';
+// Popups (Rs1 payment / connect channel / welcome) + shared popup shell
+import '../widgets/app_popups.dart';
 // Milestone achievement popup (subscribers / views card)
 import '../widgets/milestone_popup.dart';
-// Rs1 offer popup helper (once after welcome, again only when the user tries to upload/generate)
-import '../widgets/subscription_offer.dart';
 import 'upload_screen.dart';
 import 'upcoming_screen.dart';
 import 'analytics_screen.dart';
@@ -94,19 +93,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // ⚠️ FIX (bottom overlap): the background lives here, behind the Scaffold,
     // and extendBody is FALSE. The body therefore ends exactly where the
     // floating bottom bar begins, so content can never slide underneath it.
-    // DiwaliBottomNav itself is wrapped in SafeArea, so it always sits ABOVE
+    // AppBottomNav itself is wrapped in SafeArea, so it always sits ABOVE
     // the system navigation buttons.
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: DiwaliColors.creamTop,
+        systemNavigationBarColor: UiColors.bg,
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
         systemNavigationBarContrastEnforced: false,
       ),
-      child: DiwaliBackground(
+      child: AppBackground(
         child: Scaffold(
           backgroundColor: Colors.transparent,
           extendBody: false,
@@ -128,7 +127,8 @@ class _DashboardHome extends StatefulWidget {
 // WidgetsBindingObserver added so we notice when the user returns from the
 // YouTube connect screen (browser) and can show the first milestone card /
 // idea popup for the freshly connected channel.
-class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObserver {
+class _DashboardHomeState extends State<_DashboardHome>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? data;
   List<dynamic> notifications = [];
   int unreadCount = 0;
@@ -149,17 +149,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     _load().then((_) async {
       if (!mounted) return;
 
-      // Diwali welcome popup — only the first time. If shown, skip the rest this time.
-      final shownWelcome = await maybeShowDiwaliWelcome(context);
-      if (!mounted) return;
-      if (shownWelcome) {
-        // ₹1 offer: shown ONCE, right after the welcome popup (first login). If the user skips it
-        // they just see the home page; the offer only comes back when they try to upload / generate
-        // (see showSubscriptionOfferIfNeeded in widgets/subscription_offer.dart).
-        final startedOffer = await showSubscriptionOfferIfNeeded(context, onlyOnce: true);
-        if (mounted && startedOffer) _load(showLoader: false);
-        return;
-      }
+      // NEW USER FLOW (strict order): Rs1 payment -> connect channel -> welcome.
+      // While this flow is active, no other popup is shown on top of it.
+      final inFlow = await _runOnboardingFlow();
+      if (!mounted || inFlow) return;
 
       // Milestone popup has priority. If a milestone card was shown, skip
       // Rate Us and the AI Idea popup this time — no dialog on top of another.
@@ -171,7 +164,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       if (!mounted) return;
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      await _maybeShowIdeaPopup();
+      final shownIdea = await _maybeShowIdeaPopup();
+      // Subscription offer (Rs1 -> Rs10/month): never on top of another popup.
+      if (mounted && !shownIdea) await _maybeShowSubscriptionPopup();
     });
   }
 
@@ -195,6 +190,13 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       final wasConnected = youtubeChannel != null;
       await _load(showLoader: false);
       if (!mounted) return;
+      // Back from the YouTube connect page during the new-user flow:
+      // channel connected -> now show the Welcome popup (last step).
+      if (youtubeChannel != null &&
+          await _onboardingStage() == OnboardingStage.connect) {
+        await _runOnboardingFlow();
+        if (!mounted) return;
+      }
       if (!wasConnected && youtubeChannel != null) {
         var shown = false;
         for (final waitSec in const [3, 4, 5]) {
@@ -211,6 +213,136 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // NEW USER FLOW:  1) Rs1 payment  ->  2) Connect YouTube channel  ->  3) Welcome
+  // Each step starts only after the previous one is complete. The current step is
+  // stored (per account) so it survives closing the app.
+  // ---------------------------------------------------------------------------
+  bool _flowBusy = false;
+
+  String _ownerKey() => onboardingOwnerKey(context.read<AuthProvider>().user);
+
+  Future<String?> _onboardingStage() => getOnboardingStage(_ownerKey());
+
+  /// Returns true while a new-user flow is active (so nothing else pops up).
+  Future<bool> _runOnboardingFlow() async {
+    if (_flowBusy) return true;
+    var stage = await _onboardingStage();
+    if (stage == null) return false;
+    final owner = _ownerKey();
+    _flowBusy = true;
+    try {
+      // Step 1 - Rs1 payment popup.
+      if (stage == OnboardingStage.payment) {
+        final paid = await _stagePayment();
+        if (!paid) return true; // stays on this step, popup returns next time
+        stage = OnboardingStage.connect;
+        await setOnboardingStage(owner, stage);
+      }
+      if (!mounted) return true;
+
+      // Step 2 - Connect YouTube channel popup.
+      if (stage == OnboardingStage.connect) {
+        if (youtubeChannel == null) {
+          final waiting = await _stageConnect();
+          if (waiting) {
+            return true; // _onResume continues after the channel is connected
+          }
+        }
+        stage = OnboardingStage.welcome;
+        await setOnboardingStage(owner, stage);
+      }
+      if (!mounted) return true;
+
+      // Step 3 - Welcome popup (last).
+      if (stage == OnboardingStage.welcome) {
+        await setOnboardingStage(
+            owner, OnboardingStage.done); // saved BEFORE showing
+        if (!mounted) return true;
+        await showWelcomePopup(context);
+      }
+      return true;
+    } finally {
+      _flowBusy = false;
+    }
+  }
+
+  /// true = payment is done (or not possible / not needed) -> go to the next step.
+  Future<bool> _stagePayment() async {
+    Map<String, dynamic> st;
+    try {
+      st = Map<String, dynamic>.from(
+          await ApiService.instance.getSubscriptionStatus());
+    } catch (e) {
+      debugPrint('[Onboarding] status failed: $e');
+      return false; // network problem: try again next time, do not skip payment
+    }
+    // Not eligible = already paid / active subscription, or payments unavailable.
+    if (st['eligible'] != true) return true;
+
+    final offer = st['offer'] is Map
+        ? Map<String, dynamic>.from(st['offer'])
+        : <String, dynamic>{};
+    final intro = offer['introAmount'] as num?;
+    final plan = offer['planAmount'] as num?;
+    final uploads = (offer['uploads'] as num?)?.toInt();
+    if (intro == null || plan == null || uploads == null) return true;
+    if (!mounted) return false;
+
+    final start = await showSubscriptionOfferPopup(
+      context,
+      intro: intro,
+      plan: plan,
+      uploads: uploads,
+      barrierDismissible: false,
+    );
+    if (!start || !mounted) return false;
+
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const DiamondStoreScreen(autoStartSubscription: true)));
+    if (!mounted) return false;
+    _load(showLoader: false);
+    try {
+      final st2 = await ApiService.instance.getSubscriptionStatus();
+      return st2['eligible'] != true; // payment really went through
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// true = the user went to connect (we wait for them to come back).
+  /// false = user chose "close" -> continue to the Welcome popup.
+  Future<bool> _stageConnect() async {
+    final go = await showConnectYoutubePopup(context);
+    if (!go || !mounted) return false;
+    try {
+      final res = await ApiService.instance.getYoutubeOAuthUrl();
+      if (res['url'] != null) {
+        await _launchOAuth(res['url'].toString());
+        return true;
+      }
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
+    return true; // could not open the page: stay on this step, popup returns next time
+  }
+
+  Future<void> _launchOAuth(String url) async {
+    await custom_tabs.launchUrl(
+      Uri.parse(url),
+      customTabsOptions: custom_tabs.CustomTabsOptions(
+        shareState: custom_tabs.CustomTabsShareState.off,
+        urlBarHidingEnabled: true,
+        showTitle: true,
+      ),
+      safariVCOptions: const custom_tabs.SafariViewControllerOptions(
+        barCollapsingEnabled: true,
+        dismissButtonStyle:
+            custom_tabs.SafariViewControllerDismissButtonStyle.close,
+      ),
+    );
+  }
+
   Future<bool> _maybeShowIdeaPopup() async {
     // No channel connected -> no ideas. (Also do NOT start the 24h timer.)
     if (youtubeChannel == null) return false;
@@ -218,7 +350,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     final prefs = await SharedPreferences.getInstance();
     final lastShown = prefs.getInt(kIdeasPopupLastShownKey);
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (lastShown != null && now - lastShown < const Duration(hours: 24).inMilliseconds) {
+    if (lastShown != null &&
+        now - lastShown < const Duration(hours: 24).inMilliseconds) {
       return false;
     }
     if (!mounted) return false;
@@ -231,7 +364,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     // Save the time BEFORE showing: if the app is closed while the popup is open,
     // it must still count as "shown today" (it used to appear on every app open).
     await prefs.setInt(kIdeasPopupLastShownKey, now);
-    final shown = await showIdeaPopup(context, channelNiche: niche.isNotEmpty ? niche : null);
+    if (!mounted) return false;
+    final shown = await showIdeaPopup(context,
+        channelNiche: niche.isNotEmpty ? niche : null);
     if (!shown) {
       // nothing was shown (no ideas / error) -> don't burn the 24h window
       if (lastShown != null) {
@@ -243,16 +378,62 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     return shown;
   }
 
+  // Rs1 intro + Rs10/month autopay popup: every 24h until the user subscribes.
+  // Only for users the BACKEND says are eligible (never subscribed before).
+  Future<void> _maybeShowSubscriptionPopup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final last = prefs.getInt(kSubscriptionPopupLastShownKey);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (last != null &&
+          now - last < const Duration(hours: 24).inMilliseconds) {
+        return;
+      }
+
+      final st = await ApiService.instance.getSubscriptionStatus();
+      if (st['eligible'] != true || !mounted) return;
+      final offer = st['offer'] is Map
+          ? Map<String, dynamic>.from(st['offer'])
+          : <String, dynamic>{};
+      final intro = offer['introAmount'] as num?;
+      final plan = offer['planAmount'] as num?;
+      final uploads = (offer['uploads'] as num?)?.toInt();
+      if (intro == null || plan == null || uploads == null) return;
+
+      await prefs.setInt(
+          kSubscriptionPopupLastShownKey, now); // saved BEFORE showing
+      if (!mounted) return;
+      final start = await showSubscriptionOfferPopup(context,
+          intro: intro, plan: plan, uploads: uploads);
+      if (start && mounted) {
+        await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) =>
+                const DiamondStoreScreen(autoStartSubscription: true)));
+        if (mounted) _load(showLoader: false);
+      }
+    } catch (e) {
+      debugPrint('[SubscriptionPopup] skipped: $e');
+    }
+  }
+
   Future<void> _load({bool showLoader = true}) async {
     if (showLoader) setState(() => loading = true);
     try {
       final results = await Future.wait([
         ApiService.instance.dashboard(),
         ApiService.instance.getNotifications(),
-        ApiService.instance.getYoutubeChannel().catchError((_) => <String, dynamic>{}),
-        ApiService.instance.getMetaStatus().catchError((_) => <String, dynamic>{}),
-        ApiService.instance.listVideos(status: 'queued').catchError((_) => <String, dynamic>{}),
-        ApiService.instance.listVideos(status: 'uploaded').catchError((_) => <String, dynamic>{}),
+        ApiService.instance
+            .getYoutubeChannel()
+            .catchError((_) => <String, dynamic>{}),
+        ApiService.instance
+            .getMetaStatus()
+            .catchError((_) => <String, dynamic>{}),
+        ApiService.instance
+            .listVideos(status: 'queued')
+            .catchError((_) => <String, dynamic>{}),
+        ApiService.instance
+            .listVideos(status: 'uploaded')
+            .catchError((_) => <String, dynamic>{}),
       ]);
 
       final dash = results[0]['data'];
@@ -262,7 +443,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       final queuedRes = results[4];
       final uploadedRes = results[5];
 
-      final events = _extractPlatformEvents(queuedRes, const {'pending', 'queued'});
+      final events =
+          _extractPlatformEvents(queuedRes, const {'pending', 'queued'});
       events.sort((a, b) {
         final aTime = a['scheduledAt'] as String?;
         final bTime = b['scheduledAt'] as String?;
@@ -299,7 +481,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     }
   }
 
-  List<Map<String, dynamic>> _extractPlatformEvents(Map<String, dynamic> res, Set<String> statuses) {
+  List<Map<String, dynamic>> _extractPlatformEvents(
+      Map<String, dynamic> res, Set<String> statuses) {
     final out = <Map<String, dynamic>>[];
     final videos = (res['videos'] as List?) ?? [];
     for (final v in videos) {
@@ -311,7 +494,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
           'platform': p['platform'],
           'title': p['platform'] == 'youtube'
               ? (p['title'] ?? 'Untitled')
-              : ((p['caption'] ?? '').toString().isNotEmpty ? p['caption'] : 'Untitled'),
+              : ((p['caption'] ?? '').toString().isNotEmpty
+                  ? p['caption']
+                  : 'Untitled'),
           'scheduledAt': p['scheduledAt'],
           'publishedAt': p['publishedAt'],
           'thumbnailUrl': p['thumbnailUrl'] ?? '',
@@ -323,11 +508,15 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 
   void _goToProfile() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())).then((_) => _load(showLoader: false));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfileScreen()))
+        .then((_) => _load(showLoader: false));
   }
 
   void _openPreview(Map<String, dynamic> event) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UpcomingScreen())).then((_) => _load(showLoader: false));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const UpcomingScreen()))
+        .then((_) => _load(showLoader: false));
   }
 
   String? _userEmail(BuildContext context) {
@@ -344,16 +533,12 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   String _userFirstName(BuildContext context) {
     final user = context.watch<AuthProvider>().user ?? {};
     final name = user['name'];
-    if (name is String && name.trim().isNotEmpty) return name.trim().split(' ').first;
+    if (name is String && name.trim().isNotEmpty) {
+      return name.trim().split(' ').first;
+    }
     final email = _userEmail(context);
     if (email != null && email.contains('@')) return email.split('@').first;
     return context.tr('there_fallback');
-  }
-
-  int get _diamondCostPerUpload {
-    final cost = data?['diamondCostPerUpload'] ?? data?['uploadCostDiamonds'];
-    if (cost is num && cost > 0) return cost.toInt();
-    return 10;
   }
 
   // "remaining / total" card. Remaining comes from the backend. Total: backend
@@ -361,18 +546,29 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   ({int remaining, int total}) _freeUploads() {
     int? n(dynamic v) => v is num ? v.toInt() : int.tryParse('${v ?? ''}');
     final remaining = n(data?['remainingFreeUploads']) ?? 0;
-    final explicit = n(data?['totalFreeUploads'] ?? data?['freeUploadsLimit'] ?? data?['monthlyFreeUploads']);
+    final explicit = n(data?['totalFreeUploads'] ??
+        data?['freeUploadsLimit'] ??
+        data?['monthlyFreeUploads']);
     final used = n(data?['usedFreeUploads'] ?? data?['freeUploadsUsed']);
-    final total = (explicit != null && explicit > 0) ? explicit : (used != null ? remaining + used : 20);
+    final total = (explicit != null && explicit > 0)
+        ? explicit
+        : (used != null ? remaining + used : 20);
     return (remaining: remaining, total: max(total, remaining));
   }
 
-  ({String label, Color color}) _platformMeta(BuildContext context, String? platform) {
+  ({String label, Color color}) _platformMeta(
+      BuildContext context, String? platform) {
     switch (platform) {
       case 'youtube':
-        return (label: context.tr('platform_youtube_label'), color: AppColors.red);
+        return (
+          label: context.tr('platform_youtube_label'),
+          color: AppColors.red
+        );
       case 'facebook':
-        return (label: context.tr('platform_facebook_label'), color: AppColors.diamond);
+        return (
+          label: context.tr('platform_facebook_label'),
+          color: AppColors.diamond
+        );
       default:
         return (label: platform ?? '', color: AppColors.purple);
     }
@@ -381,16 +577,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   @override
   Widget build(BuildContext context) {
     final diamondBalance = (data?['diamondBalance'] ?? 0) as num;
-    final worthUploads = diamondBalance ~/ _diamondCostPerUpload;
     final free = _freeUploads();
 
-    // The cream background is provided by DashboardScreen, so this
-    // Scaffold is simply transparent. The two hanging diyas are drawn on top
-    // (IgnorePointer, so they never block taps).
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Scaffold(
+    // The background is provided by DashboardScreen, so this Scaffold is simply transparent.
+    return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -405,8 +595,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
           statusBarBrightness: Brightness.light,
         ),
         toolbarHeight: 66,
-        // Side spacing keeps the logo / buttons clear of the hanging diyas.
-        titleSpacing: 36,
+        titleSpacing: 16,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -419,10 +608,18 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                 children: [
                   RichText(
                     text: const TextSpan(
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 23, height: 1.05, letterSpacing: -0.5),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 23,
+                          height: 1.05,
+                          letterSpacing: -0.5),
                       children: [
-                        TextSpan(text: 'Tube', style: TextStyle(color: DiwaliColors.purpleDark)),
-                        TextSpan(text: 'Pilot', style: TextStyle(color: DiwaliColors.purple)),
+                        TextSpan(
+                            text: 'Tube',
+                            style: TextStyle(color: UiColors.purpleDark)),
+                        TextSpan(
+                            text: 'Pilot',
+                            style: TextStyle(color: UiColors.purple)),
                       ],
                     ),
                   ),
@@ -432,7 +629,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                     child: Text(
                       'Your YouTube Growth Partner',
                       maxLines: 1,
-                      style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 10.5, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: UiColors.purpleDark,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -445,15 +645,26 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
             clipBehavior: Clip.none,
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none_rounded, color: DiwaliColors.purpleDark, size: 26),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NotificationsScreen())).then((_) => _load(showLoader: false)),
+                icon: const Icon(Icons.notifications_none_rounded,
+                    color: UiColors.purpleDark, size: 26),
+                onPressed: () => Navigator.of(context)
+                    .push(MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen()))
+                    .then((_) => _load(showLoader: false)),
               ),
               if (unreadCount > 0)
-                Positioned(right: 10, top: 10, child: Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle))),
+                Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                            color: AppColors.red, shape: BoxShape.circle))),
             ],
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 38, left: 2),
+            padding: const EdgeInsets.only(right: 16, left: 2),
             child: Tooltip(
               message: context.tr('profile_tooltip'),
               child: GestureDetector(
@@ -466,14 +677,17 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [DiwaliColors.purple, DiwaliColors.purpleDark],
+                      colors: [UiColors.purple, UiColors.purpleDark],
                     ),
                     shape: BoxShape.circle,
-                    border: Border.all(color: DiwaliColors.goldLight, width: 1.5),
+                    border: Border.all(color: UiColors.goldLight, width: 1.5),
                   ),
                   child: Text(
                     _userInitial(context),
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -488,9 +702,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
               child: ListView(
                 // Bottom padding is small: the body already ends above the
                 // floating nav bar (extendBody: false), so nothing is hidden.
-                padding: const EdgeInsets.fromLTRB(_kScreenPadding, 8, _kScreenPadding, 24),
+                padding: const EdgeInsets.fromLTRB(
+                    _kScreenPadding, 8, _kScreenPadding, 24),
                 children: [
-                  // ---- Greeting (large + bold) + subtext (small + grey) + Happy Diwali badge ----
+                  // ---- Greeting (large + bold) + subtext (small + grey) ----
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -506,7 +721,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                                 style: const TextStyle(
                                   fontSize: 30,
                                   fontWeight: FontWeight.w800,
-                                  color: DiwaliColors.purpleDark,
+                                  color: UiColors.purpleDark,
                                   letterSpacing: -0.4,
                                 ),
                               ),
@@ -516,19 +731,13 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                               context.tr('welcome_back_subtitle'),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: DiwaliColors.textDim, fontSize: 13.5, height: 1.25),
+                              style: const TextStyle(
+                                  color: UiColors.textDim,
+                                  fontSize: 13.5,
+                                  height: 1.25),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Badge + marigold flowers on its right edge.
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const _HappyDiwaliBadge(),
-                          const Positioned(right: -22, top: 2, child: IgnorePointer(child: DiwaliSideFlowers())),
-                        ],
                       ),
                     ],
                   ),
@@ -559,9 +768,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                         margin: const EdgeInsets.only(top: 9),
                         padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
                         decoration: BoxDecoration(
-                          color: DiwaliColors.creamTop.withValues(alpha: 0.7),
+                          color: UiColors.bg,
                           borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: DiwaliColors.gold.withValues(alpha: 0.8), width: 1.3),
+                          border: Border.all(
+                              color: UiColors.purpleDark, width: 1.6),
                         ),
                         child: IntrinsicHeight(
                           child: Row(
@@ -572,18 +782,24 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                                   label: 'Free Uploads',
                                   value: '${free.remaining} / ${free.total}',
                                   onTap: () => Navigator.of(context)
-                                      .push(MaterialPageRoute(builder: (_) => const UploadScreen()))
+                                      .push(MaterialPageRoute(
+                                          builder: (_) => const UploadScreen()))
                                       .then((_) => _load(showLoader: false)),
                                 ),
                               ),
-                              VerticalDivider(width: 12, thickness: 1, color: DiwaliColors.gold.withValues(alpha: 0.6)),
+                              VerticalDivider(
+                                  width: 12,
+                                  thickness: 1,
+                                  color: UiColors.purpleDark
+                                      .withValues(alpha: 0.5)),
                               Expanded(
                                 child: _BenefitCell(
                                   icon: Icons.diamond_outlined,
                                   label: 'Diamonds',
                                   value: _fmtThousands(diamondBalance.toInt()),
                                   onTap: () => Navigator.of(context)
-                                      .push(MaterialPageRoute(builder: (_) => const WalletScreen()))
+                                      .push(MaterialPageRoute(
+                                          builder: (_) => const WalletScreen()))
                                       .then((_) => _load(showLoader: false)),
                                 ),
                               ),
@@ -598,10 +814,14 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                         child: Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            color: DiwaliColors.creamTop,
+                            color: UiColors.bg,
                             child: const Text(
                               'YOUR BENEFITS',
-                              style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 11, letterSpacing: 1.6, fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                  color: UiColors.purpleDark,
+                                  fontSize: 11,
+                                  letterSpacing: 1.6,
+                                  fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
@@ -613,7 +833,11 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                   // ---- Quick Actions ----
                   Text(
                     context.tr('quick_actions'),
-                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, letterSpacing: -0.3),
+                    style: const TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        color: UiColors.purpleDark,
+                        letterSpacing: -0.3),
                   ),
                   const SizedBox(height: 10),
                   IntrinsicHeight(
@@ -624,7 +848,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           child: _quickAction(
                             icon: Icons.cloud_upload_outlined,
                             label: context.tr('qa_upload_video'),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UploadScreen())).then((_) => _load(showLoader: false)),
+                            onTap: () => Navigator.of(context)
+                                .push(MaterialPageRoute(
+                                    builder: (_) => const UploadScreen()))
+                                .then((_) => _load(showLoader: false)),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -633,7 +860,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                             icon: Icons.podcasts_rounded,
                             label: context.tr('qa_live_stream'),
                             onTap: () => Navigator.of(context)
-                                .push(MaterialPageRoute(builder: (_) => const LiveStreamScreen()))
+                                .push(MaterialPageRoute(
+                                    builder: (_) => const LiveStreamScreen()))
                                 .then((_) => _load(showLoader: false)),
                           ),
                         ),
@@ -642,7 +870,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           child: _quickAction(
                             icon: Icons.auto_awesome_rounded,
                             label: context.tr('qa_ai_ideas'),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiIdeasScreen())),
+                            onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => const AiIdeasScreen())),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -650,8 +880,11 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           child: _quickAction(
                             icon: Icons.edit_note_rounded,
                             label: context.tr('qa_description_ideas'),
-                            onTap: () => Navigator.of(context)
-                                .push(MaterialPageRoute(builder: (_) => const AiTitleDescriptionScreen(startInDescriptionMode: true))),
+                            onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AiTitleDescriptionScreen(
+                                            startInDescriptionMode: true))),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -660,7 +893,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                             icon: Icons.workspace_premium_rounded,
                             label: 'Premium',
                             onTap: () => Navigator.of(context)
-                                .push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen()))
+                                .push(MaterialPageRoute(
+                                    builder: (_) => const DiamondStoreScreen()))
                                 .then((_) => _load(showLoader: false)),
                           ),
                         ),
@@ -679,7 +913,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                             icon: Icons.workspace_premium_rounded,
                             title: context.tr('qa_channel_audit'),
                             subtitle: 'Get detailed insights & improve.',
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ChannelAuditScreen())),
+                            onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ChannelAuditScreen())),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -688,7 +925,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                             icon: Icons.emoji_events_rounded,
                             title: 'Competitor Analysis',
                             subtitle: 'See what your competitors do.',
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompetitorRadarScreen())),
+                            onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const CompetitorRadarScreen())),
                           ),
                         ),
                       ],
@@ -697,31 +937,44 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                   const SizedBox(height: _kRowGap),
 
                   // ---- Upcoming Schedule ----
-                  DiwaliCard(
+                  AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const _IconCircle(icon: Icons.calendar_month_rounded, size: 34, iconSize: 19),
+                            const _IconCircle(
+                                icon: Icons.calendar_month_rounded,
+                                size: 34,
+                                iconSize: 19),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 context.tr('upcoming_schedule'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: UiColors.purpleDark),
                               ),
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UpcomingScreen())),
+                              onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) => const UpcomingScreen())),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(context.tr('see_all'), style: const TextStyle(color: DiwaliColors.purple, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                                  Text(context.tr('see_all'),
+                                      style: const TextStyle(
+                                          color: UiColors.purple,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600)),
                                   const SizedBox(width: 3),
-                                  const Icon(Icons.arrow_forward_rounded, color: DiwaliColors.purple, size: 15),
+                                  const Icon(Icons.arrow_forward_rounded,
+                                      color: UiColors.purple, size: 15),
                                 ],
                               ),
                             ),
@@ -739,8 +992,12 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                                 thumbnailUrl: e['thumbnailUrl'],
                                 title: e['title'] ?? '',
                                 platform: e['platform'],
-                                badgeLabel: e['status'] == 'pending' ? context.tr('status_scheduled') : context.tr('status_queued'),
-                                dateLabel: e['scheduledAt'] != null ? formatDateTime(e['scheduledAt']) : context.tr('publishing_now'),
+                                badgeLabel: e['status'] == 'pending'
+                                    ? context.tr('status_scheduled')
+                                    : context.tr('status_queued'),
+                                dateLabel: e['scheduledAt'] != null
+                                    ? formatDateTime(e['scheduledAt'])
+                                    : context.tr('publishing_now'),
                                 onTap: () => _openPreview(e),
                               )),
                       ],
@@ -749,20 +1006,26 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                   const SizedBox(height: _kRowGap),
 
                   // ---- Recent Activity ----
-                  DiwaliCard(
+                  AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const _IconCircle(icon: Icons.bolt_rounded, size: 34, iconSize: 19),
+                            const _IconCircle(
+                                icon: Icons.bolt_rounded,
+                                size: 34,
+                                iconSize: 19),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 context.tr('recent_activity_home'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: UiColors.purpleDark),
                               ),
                             ),
                           ],
@@ -780,7 +1043,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                                 title: e['title'] ?? '',
                                 platform: e['platform'],
                                 badgeLabel: context.tr('status_published'),
-                                dateLabel: formatDate(e['publishedAt'] ?? e['scheduledAt']),
+                                dateLabel: formatDate(
+                                    e['publishedAt'] ?? e['scheduledAt']),
                               )),
                       ],
                     ),
@@ -788,14 +1052,6 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                 ],
               ),
             ),
-        ),
-        const Positioned(top: 0, left: 0, child: IgnorePointer(child: DiwaliHangingDiyas(scale: 0.62))),
-        Positioned(
-          top: 0,
-          right: 0,
-          child: IgnorePointer(child: Transform.flip(flipX: true, child: const DiwaliHangingDiyas(scale: 0.62))),
-        ),
-      ],
     );
   }
 
@@ -807,12 +1063,16 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       items.add(Expanded(child: children[i]));
     }
     return IntrinsicHeight(
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: items),
+      child:
+          Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: items),
     );
   }
 
-  Widget _quickAction({required IconData icon, required String label, required VoidCallback onTap}) {
-    return DiwaliCard(
+  Widget _quickAction(
+      {required IconData icon,
+      required String label,
+      required VoidCallback onTap}) {
+    return AppCard(
       // Five tiles share one row, so side padding is kept small here.
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
       onTap: onTap,
@@ -826,15 +1086,23 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
             textAlign: TextAlign.center,
             maxLines: 2,
             softWrap: true,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: DiwaliColors.purpleDark, height: 1.15),
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: UiColors.purpleDark,
+                height: 1.15),
           ),
         ],
       ),
     );
   }
 
-  Widget _featureCard({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
-    return DiwaliCard(
+  Widget _featureCard(
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      required VoidCallback onTap}) {
+    return AppCard(
       padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
       onTap: onTap,
       child: Row(
@@ -852,19 +1120,24 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                   child: Text(
                     title,
                     maxLines: 1,
-                    style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        color: UiColors.purpleDark,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800),
                   ),
                 ),
                 const SizedBox(height: 1),
                 Text(
                   subtitle,
                   maxLines: 2,
-                  style: const TextStyle(color: DiwaliColors.textDim, fontSize: 10, height: 1.2),
+                  style: const TextStyle(
+                      color: UiColors.textDim, fontSize: 10, height: 1.2),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: DiwaliColors.purpleDark, size: 20),
+          const Icon(Icons.chevron_right_rounded,
+              color: UiColors.purpleDark, size: 20),
         ],
       ),
     );
@@ -874,9 +1147,9 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: DiwaliColors.creamTop,
+        color: UiColors.bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.5)),
+        border: Border.all(color: UiColors.cardBorder.withValues(alpha: 0.5)),
       ),
       child: Row(
         children: [
@@ -885,7 +1158,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, height: 1.3),
+              style: const TextStyle(
+                  color: UiColors.textDim, fontSize: 12.5, height: 1.3),
             ),
           ),
         ],
@@ -909,8 +1183,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: DiwaliColors.creamTop,
-          border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.5)),
+          color: UiColors.bg,
+          border: Border.all(color: UiColors.cardBorder.withValues(alpha: 0.5)),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -920,8 +1194,11 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
               child: (thumbnailUrl != null && thumbnailUrl.isNotEmpty)
                   ? Image.network(
                       thumbnailUrl,
-                      width: 56, height: 56, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _thumbnailFallback(meta.color),
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          _thumbnailFallback(meta.color),
                     )
                   : _thumbnailFallback(meta.color),
             ),
@@ -930,17 +1207,29 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: DiwaliColors.purpleDark)),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.5,
+                          color: UiColors.purpleDark)),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       _platformBadgeIcon(platform),
                       const SizedBox(width: 5),
-                      Text(meta.label, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      Text(meta.label,
+                          style: const TextStyle(
+                              color: UiColors.textDim,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600)),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(dateLabel, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11)),
+                  Text(dateLabel,
+                      style: const TextStyle(
+                          color: UiColors.textDim, fontSize: 11)),
                 ],
               ),
             ),
@@ -954,7 +1243,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
 
   Widget _thumbnailFallback(Color color) {
     return Container(
-      width: 56, height: 56,
+      width: 56,
+      height: 56,
       alignment: Alignment.center,
       color: color.withValues(alpha: 0.14),
       child: Icon(Icons.movie_outlined, color: color, size: 22),
@@ -978,7 +1268,8 @@ class _IconCircle extends StatelessWidget {
   final IconData icon;
   final double size;
   final double iconSize;
-  const _IconCircle({required this.icon, required this.size, required this.iconSize});
+  const _IconCircle(
+      {required this.icon, required this.size, required this.iconSize});
 
   @override
   Widget build(BuildContext context) {
@@ -986,87 +1277,9 @@ class _IconCircle extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(shape: BoxShape.circle, color: DiwaliColors.iconCircle),
-      child: Icon(icon, color: DiwaliColors.purpleDeep, size: iconSize),
-    );
-  }
-}
-
-// "Happy Diwali" badge next to the greeting.
-class _HappyDiwaliBadge extends StatelessWidget {
-  const _HappyDiwaliBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 112,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const DiwaliDiya(width: 34),
-          Transform.translate(
-            offset: const Offset(-18, -4),
-            child: Text(
-              'Happy',
-              style: DiwaliColors.script.copyWith(color: DiwaliColors.purple, fontSize: 15, fontWeight: FontWeight.w600, height: 1.0),
-            ),
-          ),
-          Transform.translate(
-            offset: const Offset(0, -8),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                'Diwali',
-                style: DiwaliColors.script.copyWith(color: DiwaliColors.purpleDark, fontSize: 36, fontWeight: FontWeight.w800, height: 1.0),
-              ),
-            ),
-          ),
-          Transform.translate(
-            offset: const Offset(0, -6),
-            child: const FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                '\u2022 STAY CREATIVE \u2022 STAY BLESSED \u2022',
-                style: TextStyle(color: DiwaliColors.purpleDark, fontSize: 6.5, letterSpacing: 0.9, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String? subtitle;
-  final VoidCallback? onTap;
-  const _MetricCard({required this.icon, required this.label, required this.value, this.subtitle, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return DiwaliCard(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _IconCircle(icon: icon, size: 36, iconSize: 19),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w700),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: DiwaliColors.purpleDark, height: 1.2)),
-          if (subtitle != null)
-            Text(subtitle!, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
-      ),
+      decoration: const BoxDecoration(
+          shape: BoxShape.circle, color: UiColors.iconCircle),
+      child: Icon(icon, color: UiColors.purpleDeep, size: iconSize),
     );
   }
 }
@@ -1136,7 +1349,8 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
 
   void _goNext() {
     if (_index < widget.ideas.length - 1) {
-      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      _pageController.nextPage(
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     } else {
       Navigator.of(context).pop();
     }
@@ -1155,7 +1369,9 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
     _goNext();
 
     await Future.delayed(const Duration(milliseconds: 620));
-    if (mounted) setState(() => _flyingEmojis.removeWhere((f) => f.id == flyId));
+    if (mounted) {
+      setState(() => _flyingEmojis.removeWhere((f) => f.id == flyId));
+    }
   }
 
   Future<void> _copyIdea(Map<String, dynamic> idea) async {
@@ -1163,10 +1379,17 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
     final desc = (idea['description'] ?? idea['hook'] ?? '').toString();
     final text = desc.isNotEmpty ? '$title\n\n$desc' : title;
     await Clipboard.setData(ClipboardData(text: text));
-    if (mounted) showToast(context, context.tr('idea_popup_copied_toast'), isSuccess: true);
+    if (mounted) {
+      showToast(context, context.tr('idea_popup_copied_toast'),
+          isSuccess: true);
+    }
   }
 
-  Widget _peekCard({required double angle, required double top, required double opacity, required double scale}) {
+  Widget _peekCard(
+      {required double angle,
+      required double top,
+      required double opacity,
+      required double scale}) {
     return Positioned(
       top: top,
       child: Transform.rotate(
@@ -1180,10 +1403,16 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
               width: 190,
               height: 300,
               decoration: BoxDecoration(
-                color: DiwaliColors.cardTop,
+                color: UiColors.cardTop,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.8)),
-                boxShadow: [BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 3))],
+                border: Border.all(
+                    color: UiColors.cardBorder.withValues(alpha: 0.8)),
+                boxShadow: [
+                  BoxShadow(
+                      color: UiColors.goldDeep.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3))
+                ],
               ),
             ),
           ),
@@ -1201,11 +1430,16 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [DiwaliColors.cardTop, DiwaliColors.cardBottom],
+          colors: [UiColors.cardTop, UiColors.cardBottom],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: DiwaliColors.cardBorder),
-        boxShadow: [BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 6))],
+        border: Border.all(color: UiColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+              color: UiColors.goldDeep.withValues(alpha: 0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 6))
+        ],
       ),
       child: SingleChildScrollView(
         physics: const NeverScrollableScrollPhysics(),
@@ -1219,22 +1453,36 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                   width: 28,
                   height: 28,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: DiwaliColors.gold.withValues(alpha: 0.22), shape: BoxShape.circle),
-                  child: const Icon(Icons.lightbulb_rounded, color: DiwaliColors.purpleDeep, size: 15),
+                  decoration: BoxDecoration(
+                      color: UiColors.gold.withValues(alpha: 0.22),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.lightbulb_rounded,
+                      color: UiColors.purpleDeep, size: 15),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    context.tr('idea_popup_card_label').replaceAll('%d', '${idx + 1}'),
-                    style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11, fontWeight: FontWeight.w700),
+                    context
+                        .tr('idea_popup_card_label')
+                        .replaceAll('%d', '${idx + 1}'),
+                    style: const TextStyle(
+                        color: UiColors.textDim,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 14),
-            Text(idea['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark)),
+            Text(idea['title'] ?? '',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: UiColors.purpleDark)),
             const SizedBox(height: 10),
-            Text(idea['description'] ?? idea['hook'] ?? '', style: const TextStyle(color: DiwaliColors.textDim, fontSize: 12.5, height: 1.4)),
+            Text(idea['description'] ?? idea['hook'] ?? '',
+                style: const TextStyle(
+                    color: UiColors.textDim, fontSize: 12.5, height: 1.4)),
           ],
         ),
       ),
@@ -1273,7 +1521,7 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
   Widget build(BuildContext context) {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-      child: DiwaliPopupShell(
+      child: AppPopupShell(
         onClose: () => Navigator.of(context).pop(),
         padding: const EdgeInsets.fromLTRB(20, 26, 20, 14),
         child: Stack(
@@ -1288,21 +1536,27 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.auto_awesome_rounded, color: DiwaliColors.purpleDeep, size: 18),
+                      const Icon(Icons.auto_awesome_rounded,
+                          color: UiColors.purpleDeep, size: 18),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
                           context.tr('idea_popup_title'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: DiwaliColors.purpleDark),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: UiColors.purpleDark),
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text('${_index + 1}/${widget.ideas.length}', style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11.5)),
+                Text('${_index + 1}/${widget.ideas.length}',
+                    style: const TextStyle(
+                        color: UiColors.textDim, fontSize: 11.5)),
                 const SizedBox(height: 10),
 
                 SizedBox(
@@ -1312,9 +1566,11 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                     clipBehavior: Clip.none,
                     children: [
                       if (_index < widget.ideas.length - 2)
-                        _peekCard(angle: -0.15, top: 12, opacity: 0.45, scale: 0.92),
+                        _peekCard(
+                            angle: -0.15, top: 12, opacity: 0.45, scale: 0.92),
                       if (_index < widget.ideas.length - 1)
-                        _peekCard(angle: 0.11, top: 6, opacity: 0.7, scale: 0.96),
+                        _peekCard(
+                            angle: 0.11, top: 6, opacity: 0.7, scale: 0.96),
                       AnimatedOpacity(
                         opacity: _dismissing ? 0 : 1,
                         duration: const Duration(milliseconds: 300),
@@ -1327,7 +1583,8 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                             controller: _pageController,
                             itemCount: widget.ideas.length,
                             onPageChanged: (i) => setState(() => _index = i),
-                            itemBuilder: (_, i) => Center(child: _ideaCard(widget.ideas[i], i)),
+                            itemBuilder: (_, i) =>
+                                Center(child: _ideaCard(widget.ideas[i], i)),
                           ),
                         ),
                       ),
@@ -1337,7 +1594,10 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                 const SizedBox(height: 4),
                 Text(
                   context.tr('idea_popup_swipe_hint'),
-                  style: const TextStyle(color: DiwaliColors.textDim, fontSize: 10.5, fontStyle: FontStyle.italic),
+                  style: const TextStyle(
+                      color: UiColors.textDim,
+                      fontSize: 10.5,
+                      fontStyle: FontStyle.italic),
                 ),
                 const SizedBox(height: 10),
 
@@ -1346,22 +1606,28 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
                   children: _reactions
                       .map((e) => GestureDetector(
                             onTap: () => _onReactionTap(e),
-                            child: Text(e, style: const TextStyle(fontSize: 26)),
+                            child:
+                                Text(e, style: const TextStyle(fontSize: 26)),
                           ))
                       .toList(),
                 ),
                 const SizedBox(height: 12),
 
-                DiwaliButton(
+                AppButton(
                   label: context.tr('idea_popup_copy_btn'),
-                  leading: const Icon(Icons.copy_rounded, size: 16, color: Colors.white),
+                  leading: const Icon(Icons.copy_rounded,
+                      size: 16, color: Colors.white),
                   onTap: () => _copyIdea(widget.ideas[_index]),
                 ),
                 const SizedBox(height: 2),
                 TextButton(
-                  style: TextButton.styleFrom(foregroundColor: DiwaliColors.purpleDark),
+                  style: TextButton.styleFrom(
+                      foregroundColor: UiColors.purpleDark),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(context.tr('skip'), style: const TextStyle(color: DiwaliColors.purpleDark, fontWeight: FontWeight.w600)),
+                  child: Text(context.tr('skip'),
+                      style: const TextStyle(
+                          color: UiColors.purpleDark,
+                          fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -1372,7 +1638,6 @@ class _IdeaPopupDialogState extends State<_IdeaPopupDialog> {
     );
   }
 }
-
 
 String _fmtThousands(int n) {
   final s = n.abs().toString();
@@ -1390,11 +1655,15 @@ class _CompactStat extends StatelessWidget {
   final String label;
   final String value;
   final String subtitle;
-  const _CompactStat({required this.icon, required this.label, required this.value, required this.subtitle});
+  const _CompactStat(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    return DiwaliCard(
+    return AppCard(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
@@ -1408,13 +1677,26 @@ class _CompactStat extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(label, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  child: Text(label,
+                      maxLines: 1,
+                      style: const TextStyle(
+                          color: UiColors.purpleDark,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700)),
                 ),
-                Text(value, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 21, fontWeight: FontWeight.w800, height: 1.15)),
+                Text(value,
+                    style: const TextStyle(
+                        color: UiColors.purpleDark,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15)),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(subtitle, maxLines: 1, style: const TextStyle(color: DiwaliColors.textDim, fontSize: 11)),
+                  child: Text(subtitle,
+                      maxLines: 1,
+                      style: const TextStyle(
+                          color: UiColors.textDim, fontSize: 11)),
                 ),
               ],
             ),
@@ -1431,7 +1713,11 @@ class _BenefitCell extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onTap;
-  const _BenefitCell({required this.icon, required this.label, required this.value, this.onTap});
+  const _BenefitCell(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1452,12 +1738,22 @@ class _BenefitCell extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(label, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                    child: Text(label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            color: UiColors.purpleDark,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500)),
                   ),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(value, maxLines: 1, style: const TextStyle(color: DiwaliColors.purpleDark, fontSize: 20, fontWeight: FontWeight.w800)),
+                    child: Text(value,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            color: UiColors.purpleDark,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800)),
                   ),
                 ],
               ),

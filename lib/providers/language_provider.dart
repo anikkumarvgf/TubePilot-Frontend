@@ -13,7 +13,8 @@ class LanguageProvider extends ChangeNotifier {
 
   String _languageCode = 'en';
   String get languageCode => _languageCode;
-  String get languageName => AppStrings.codeToLanguageName[_languageCode] ?? 'English';
+  String get languageName =>
+      AppStrings.codeToLanguageName[_languageCode] ?? 'English';
 
   /// Call once at app startup (see main.dart) to restore the last-selected
   /// language before the first frame, avoiding a flash of English → chosen
@@ -59,7 +60,7 @@ class LanguageProvider extends ChangeNotifier {
 /// `context.watch<LanguageProvider>().tr('key')` everywhere.
 extension LocalizationExtension on BuildContext {
   String tr(String key) {
-    final scope = this.dependOnInheritedWidgetOfExactType<_LanguageInherited>();
+    final scope = dependOnInheritedWidgetOfExactType<_LanguageInherited>();
     if (scope != null) return AppStrings.tr(key, scope.languageCode);
     // Fallback: still works even if used outside the InheritedWidget scope,
     // just won't auto-rebuild on language change in that spot.
@@ -74,7 +75,8 @@ extension LocalizationExtension on BuildContext {
 class LanguageScope extends StatelessWidget {
   final LanguageProvider languageProvider;
   final Widget child;
-  const LanguageScope({super.key, required this.languageProvider, required this.child});
+  const LanguageScope(
+      {super.key, required this.languageProvider, required this.child});
 
   @override
   Widget build(BuildContext context) {

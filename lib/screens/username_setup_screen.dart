@@ -25,7 +25,15 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
 
   // NOTE: kept as language NAMES (not translated) since this list is sent
   // to the backend as-is and also drives ApiService.setupUsername(language: ...).
-  final _languages = const ['English', 'Hindi', 'Hinglish', 'Tamil', 'Bengali', 'Marathi', 'Urdu'];
+  final _languages = const [
+    'English',
+    'Hindi',
+    'Hinglish',
+    'Tamil',
+    'Bengali',
+    'Marathi',
+    'Urdu'
+  ];
 
   @override
   void initState() {
@@ -43,7 +51,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     base = base.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (base.length < 3) base = 'creator';
     if (base.length > 15) base = base.substring(0, 15);
-    final suffix = (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
+    final suffix =
+        (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
     _usernameCtrl.text = '${base}_$suffix';
   }
 
@@ -78,13 +87,19 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(context.tr('select_language_label'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                    child: Text(context.tr('select_language_label'),
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
                   ),
                 ),
                 const SizedBox(height: 8),
                 ..._languages.map((lang) => ListTile(
-                      title: Text(lang, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      trailing: lang == _language ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
+                      title: Text(lang,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      trailing: lang == _language
+                          ? const Icon(Icons.check_rounded,
+                              color: AppColors.purple)
+                          : null,
                       onTap: () => Navigator.pop(sheetContext, lang),
                     )),
                 const SizedBox(height: 8),
@@ -102,16 +117,19 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   Future<void> _save() async {
     final username = _usernameCtrl.text.trim().replaceFirst('@', '');
     if (username.length < 3) {
-      showToast(context, context.tr('username_min_length_error'), isError: true);
+      showToast(context, context.tr('username_min_length_error'),
+          isError: true);
       return;
     }
     setState(() => _loading = true);
     try {
-      await context.read<AuthProvider>().setupUsername(username: username, language: _language);
+      await context
+          .read<AuthProvider>()
+          .setupUsername(username: username, language: _language);
       if (!mounted) return;
       await _showWelcomeFlow();
     } catch (e) {
-      showApiError(context, e);
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -146,7 +164,10 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                 enabled: !submitting,
                 textCapitalization: TextCapitalization.characters,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: DiwaliColors.inkBlack, fontWeight: FontWeight.w700, letterSpacing: 1),
+                style: const TextStyle(
+                    color: DiwaliColors.inkBlack,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1),
                 onChanged: (_) {
                   if (errorText != null) setDialogState(() => errorText = null);
                 },
@@ -156,18 +177,22 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   errorMaxLines: 3,
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.7)),
+                    borderSide: BorderSide(
+                        color: DiwaliColors.gold.withValues(alpha: 0.7)),
                   ),
                   disabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: DiwaliColors.gold.withValues(alpha: 0.4)),
+                    borderSide: BorderSide(
+                        color: DiwaliColors.gold.withValues(alpha: 0.4)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: DiwaliColors.purple, width: 1.6),
+                    borderSide: const BorderSide(
+                        color: DiwaliColors.purple, width: 1.6),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -175,7 +200,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   ),
                   focusedErrorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
+                    borderSide:
+                        const BorderSide(color: Colors.redAccent, width: 1.6),
                   ),
                 ),
               ),
@@ -196,7 +222,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   : () async {
                       final code = referralCtrl.text.trim();
                       if (code.isEmpty) {
-                        setDialogState(() => errorText = 'Please enter a referral code, or tap Skip.');
+                        setDialogState(() => errorText =
+                            'Please enter a referral code, or tap Skip.');
                         return;
                       }
                       setDialogState(() {
@@ -204,22 +231,31 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                         errorText = null;
                       });
                       try {
-                        final res = await ApiService.instance.applyReferralCode(code);
+                        final res =
+                            await ApiService.instance.applyReferralCode(code);
                         // Even a 200 response can mean "not matched" (success:false) -> stay open.
                         if (res['success'] == false) {
-                          final failMsg = (res['message'] ?? '').toString().trim();
+                          final failMsg =
+                              (res['message'] ?? '').toString().trim();
                           if (dialogContext.mounted) {
                             setDialogState(() {
                               submitting = false;
-                              errorText = failMsg.isNotEmpty ? failMsg : 'Referral code did not match. Please check and try again.';
+                              errorText = failMsg.isNotEmpty
+                                  ? failMsg
+                                  : 'Referral code did not match. Please check and try again.';
                             });
                           }
                           return;
                         }
-                        if (mounted) showToast(context, res['message'] ?? context.tr('referral_applied'), isSuccess: true);
+                        if (mounted) {
+                          showToast(context,
+                              res['message'] ?? context.tr('referral_applied'),
+                              isSuccess: true);
+                        }
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
                       } catch (e) {
-                        final msg = (e is ApiException && e.message.trim().isNotEmpty)
+                        final msg = (e is ApiException &&
+                                e.message.trim().isNotEmpty)
                             ? e.message
                             : 'Referral code did not match. Please check and try again.';
                         if (dialogContext.mounted) {
@@ -251,7 +287,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
       ),
       safariVCOptions: const custom_tabs.SafariViewControllerOptions(
         barCollapsingEnabled: true,
-        dismissButtonStyle: custom_tabs.SafariViewControllerDismissButtonStyle.close,
+        dismissButtonStyle:
+            custom_tabs.SafariViewControllerDismissButtonStyle.close,
       ),
     );
   }
@@ -285,7 +322,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   : () async {
                       setDialogState(() => connecting = true);
                       try {
-                        final res = await ApiService.instance.getYoutubeOAuthUrl();
+                        final res =
+                            await ApiService.instance.getYoutubeOAuthUrl();
                         final url = res['url'] as String?;
                         if (url != null) {
                           await _launchOAuth(url);
@@ -318,7 +356,8 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     // even when the user tapped Skip and had NO channel. Removed. Ideas now
     // appear only from the dashboard, only for a connected channel, using
     // that channel's own category (see dashboard_screen.dart).
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen()));
+    Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DashboardScreen()));
   }
 
   @override
@@ -338,37 +377,57 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 30),
-                Text(context.tr('setup_profile_title'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                Text(context.tr('setup_profile_title'),
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 24),
                 Center(
                   child: Container(
-                    width: 82, height: 82,
-                    decoration: BoxDecoration(gradient: AppColors.gradient, shape: BoxShape.circle),
+                    width: 82,
+                    height: 82,
+                    decoration: BoxDecoration(
+                        gradient: AppColors.gradient, shape: BoxShape.circle),
                     child: avatar != null && avatar.toString().isNotEmpty
-                        ? ClipOval(child: Image.network(avatar, fit: BoxFit.cover))
-                        : const Center(child: Icon(Icons.person_rounded, color: Colors.white, size: 36)),
+                        ? ClipOval(
+                            child: Image.network(avatar, fit: BoxFit.cover))
+                        : const Center(
+                            child: Icon(Icons.person_rounded,
+                                color: Colors.white, size: 36)),
                   ),
                 ),
                 const SizedBox(height: 24),
-                Text(context.tr('username_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                Text(context.tr('username_label'),
+                    style: TextStyle(
+                        color: context.surfaces.textDim, fontSize: 13)),
                 const SizedBox(height: 4),
-                Text(context.tr('username_suggested_hint'), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                Text(context.tr('username_suggested_hint'),
+                    style: TextStyle(
+                        color: context.surfaces.textDim, fontSize: 11.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _usernameCtrl,
-                  decoration: const InputDecoration(hintText: '@tech_creator', prefixIcon: Icon(Icons.alternate_email_rounded, size: 18)),
+                  decoration: const InputDecoration(
+                      hintText: '@tech_creator',
+                      prefixIcon:
+                          Icon(Icons.alternate_email_rounded, size: 18)),
                 ),
                 const SizedBox(height: 16),
-                Text(context.tr('select_language_label'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
+                Text(context.tr('select_language_label'),
+                    style: TextStyle(
+                        color: context.surfaces.textDim, fontSize: 13)),
                 const SizedBox(height: 6),
                 // ⚠️ FIX: bottom-sheet PickerField instead of CustomDropdown.
                 PickerField(
                   value: _language,
                   onTap: _openLanguageSheet,
-                  prefixIcon: const Icon(Icons.language_rounded, size: 18, color: AppColors.purple),
+                  prefixIcon: const Icon(Icons.language_rounded,
+                      size: 18, color: AppColors.purple),
                 ),
                 const SizedBox(height: 30),
-                GradientButton(label: context.tr('continue_btn'), loading: _loading, onPressed: _save),
+                GradientButton(
+                    label: context.tr('continue_btn'),
+                    loading: _loading,
+                    onPressed: _save),
               ],
             ),
           ),

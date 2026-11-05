@@ -83,10 +83,16 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Cancel autopay?'),
-        content: const Text('You will not be charged again. Your benefits stay until the period you already paid for ends.'),
+        content: const Text(
+            'You will not be charged again. Your benefits stay until the period you already paid for ends.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel autopay', style: TextStyle(color: AppColors.red))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Cancel autopay',
+                  style: TextStyle(color: AppColors.red))),
         ],
       ),
     );
@@ -94,7 +100,11 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
     setState(() => _subBusy = true);
     try {
       final r = await ApiService.instance.cancelSubscription();
-      if (mounted) showToast(context, (r['message'] ?? 'Subscription cancelled').toString(), isSuccess: true);
+      if (mounted) {
+        showToast(
+            context, (r['message'] ?? 'Subscription cancelled').toString(),
+            isSuccess: true);
+      }
       await _loadSubscription();
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -106,17 +116,20 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   Widget _subscriptionCard() {
     final st = _subStatus;
     if (st == null) return const SizedBox.shrink();
-    final offer = st['offer'] is Map ? Map<String, dynamic>.from(st['offer']) : <String, dynamic>{};
-    final sub = st['subscription'] is Map ? Map<String, dynamic>.from(st['subscription']) : null;
+    final offer = st['offer'] is Map
+        ? Map<String, dynamic>.from(st['offer'])
+        : <String, dynamic>{};
+    final sub = st['subscription'] is Map
+        ? Map<String, dynamic>.from(st['subscription'])
+        : null;
     final plan = offer['planAmount'] ?? 10;
     final intro = offer['introAmount'] ?? 1;
-    final diamonds = offer['diamonds'] ?? 0;
-    final introUploads = offer['introUploads'] ?? 20;
-    final planUploads = offer['planUploads'] ?? 30;
-    final credits = st['credits'] ?? 0;
+    final uploads = offer['uploads'] ?? 20;
+    final left = (st['uploadsLeft'] as num?)?.toInt() ?? 0;
     final status = (sub?['status'] ?? '').toString();
 
-    Widget shell({required Color border, required List<Widget> children}) => Container(
+    Widget shell({required Color border, required List<Widget> children}) =>
+        Container(
           margin: const EdgeInsets.only(top: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -124,22 +137,24 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: border, width: 1.4),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, children: children),
         );
 
     if (status == 'active') {
-      final next = sub?['nextDebitAt'];
+      final end = sub?['currentPeriodEnd'];
       return shell(border: AppColors.green, children: [
         Row(children: [
           const Icon(Icons.verified_rounded, color: AppColors.green),
           const SizedBox(width: 8),
-          const Expanded(child: Text('Subscription active', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+          const Expanded(
+              child: Text('Subscription active',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
         ]),
         const SizedBox(height: 6),
         Text(
-          next != null
-              ? 'Your uploads are over · ₹$plan will be auto-debited on ${formatDate(next.toString())} ($planUploads uploads + $diamonds diamonds)'
-              : '$credits uploads left · when they end, ₹$plan is auto-debited after a 24-hour notice',
+          '$left uploads left. When they finish, ₹$plan is auto-debited for the next $uploads uploads.'
+          '${end != null ? ' Current month ends ${formatDate(end.toString())}.' : ''}',
           style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
         ),
         const SizedBox(height: 12),
@@ -148,7 +163,10 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
           child: OutlinedButton(
             onPressed: _subBusy ? null : _cancelSubscription,
             child: _subBusy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : const Text('Cancel autopay'),
           ),
         ),
@@ -156,12 +174,12 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
     }
 
     if (status == 'cancelled') {
-      final end = sub?['currentPeriodEnd'];
       return shell(border: context.surfaces.border, children: [
-        const Text('Autopay cancelled', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+        const Text('Autopay cancelled',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 6),
         Text(
-          end != null ? 'Benefits stay until ${formatDate(end.toString())}. You will not be charged again.' : 'You will not be charged again.',
+          'You will not be charged again. Your remaining uploads stay.',
           style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5),
         ),
       ]);
@@ -169,21 +187,28 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
 
     if (st['eligible'] == true) {
       return shell(border: AppColors.purple, children: [
-        Text('$introUploads uploads for just ₹$intro', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+        Text('Start for just ₹$intro',
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
         const SizedBox(height: 6),
         Text(
-          'Pay ₹$intro now and get $introUploads uploads. '
-          'When they are used up, ₹$plan is auto-debited after a 24-hour notice and you get $planUploads uploads + $diamonds diamonds for 1 month. '
-          'Cancel anytime here.',
-          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
+          'Pay ₹$intro now and get $uploads video uploads. When they finish, ₹$plan is auto-debited '
+          'for the next $uploads uploads, and your 1-month period starts that day. '
+          'We notify you before each debit. Cancel anytime here.',
+          style: TextStyle(
+              color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
         ),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: (_subBusy || _payingDiamonds != null) ? null : _subscribe,
+            onPressed:
+                (_subBusy || _payingDiamonds != null) ? null : _subscribe,
             child: _subBusy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
                 : Text('Pay ₹$intro & start'),
           ),
         ),
@@ -217,7 +242,8 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       final r = await _payu.pay(diamonds);
       if (!mounted) return;
       if (r.approved) {
-        showToast(context, context.tr('payment_submitted_msg'), isSuccess: true);
+        showToast(context, context.tr('payment_submitted_msg'),
+            isSuccess: true);
         _load();
       } else if (r.status == 'pending') {
         showToast(context, r.message, isError: false);
@@ -245,22 +271,32 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(color: AppColors.purple, borderRadius: BorderRadius.circular(999)),
+              decoration: BoxDecoration(
+                  color: AppColors.purple,
+                  borderRadius: BorderRadius.circular(999)),
               child: const Center(
-                child: Text('💎 Diamonds', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                child: Text('💎 Diamonds',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5)),
               ),
             ),
           ),
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(999),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LivePlansScreen())),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LivePlansScreen())),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Center(
                   child: Text(
                     '📡 Live Stream',
-                    style: TextStyle(color: context.surfaces.textDim, fontWeight: FontWeight.w700, fontSize: 12.5),
+                    style: TextStyle(
+                        color: context.surfaces.textDim,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5),
                   ),
                 ),
               ),
@@ -275,13 +311,12 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: _payingDiamonds == null,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _payingDiamonds != null) {
-          showToast(context, 'Please wait — confirming your payment...', isError: false);
+          showToast(context, 'Please wait — confirming your payment...',
+              isError: false);
         }
       },
-      // Festival background wrapper — festival mode on ho to Diwali image,
-      // off ho to koi extra background nahi.
       child: AppBrandBackground(
         watermarkWhenNormal: false,
         child: Scaffold(
@@ -293,25 +328,41 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
               : SafeArea(
                   bottom: true,
                   child: ListView(
-                    padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
+                    padding: EdgeInsets.fromLTRB(20, 20, 20,
+                        20 + MediaQuery.of(context).padding.bottom + 24),
                     children: [
                       _topSwitcher(),
                       _subscriptionCard(),
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(16)),
-                        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text(context.tr('your_balance'), style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
-                          Text('💎 $balance', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                        ]),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: context.surfaces.border),
+                            borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(context.tr('your_balance'),
+                                  style: TextStyle(
+                                      color: context.surfaces.textDim,
+                                      fontSize: 13)),
+                              Text('💎 $balance',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800)),
+                            ]),
                       ),
                       const SizedBox(height: 20),
-                      Text(context.tr('choose_package'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text(context.tr('choose_package'),
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
                       const SizedBox(height: 6),
                       Text(
                         context.tr('diamond_store_description'),
-                        style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
+                        style: TextStyle(
+                            color: context.surfaces.textDim,
+                            fontSize: 12.5,
+                            height: 1.4),
                       ),
                       const SizedBox(height: 16),
                       ...List.generate(
@@ -356,7 +407,11 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 22, 16, 16),
       decoration: BoxDecoration(
-        border: Border.all(color: badgeText != null ? (badgeColor ?? context.surfaces.border) : context.surfaces.border, width: badgeText != null ? 1.4 : 1),
+        border: Border.all(
+            color: badgeText != null
+                ? (badgeColor ?? context.surfaces.border)
+                : context.surfaces.border,
+            width: badgeText != null ? 1.4 : 1),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Stack(
@@ -369,11 +424,18 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(999)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(999)),
                   child: Text(
                     badgeText.toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3),
                   ),
                 ),
               ),
@@ -392,21 +454,35 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          context.tr('diamonds_suffix').replaceAll('%d', '$diamonds'),
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5),
+                          context
+                              .tr('diamonds_suffix')
+                              .replaceAll('%d', '$diamonds'),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15.5),
                         ),
                         const SizedBox(height: 2),
-                        Text('₹${p['priceINR']}', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
+                        Text('₹${p['priceINR']}',
+                            style: TextStyle(
+                                color: context.surfaces.textDim,
+                                fontSize: 12.5)),
                       ],
                     ),
                   ),
                   if (perRupee > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(999)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: context.surfaces.card2,
+                          borderRadius: BorderRadius.circular(999)),
                       child: Text(
-                        context.tr('diamond_value_rate').replaceAll('%d', perRupee.toStringAsFixed(1)),
-                        style: TextStyle(color: context.surfaces.textDim, fontSize: 10.5, fontStyle: FontStyle.italic),
+                        context
+                            .tr('diamond_value_rate')
+                            .replaceAll('%d', perRupee.toStringAsFixed(1)),
+                        style: TextStyle(
+                            color: context.surfaces.textDim,
+                            fontSize: 10.5,
+                            fontStyle: FontStyle.italic),
                       ),
                     ),
                 ],
@@ -416,7 +492,11 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
               const SizedBox(height: 12),
               Text(
                 context.tr('diamond_whats_included'),
-                style: TextStyle(color: context.surfaces.textDim, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                style: TextStyle(
+                    color: context.surfaces.textDim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2),
               ),
               const SizedBox(height: 8),
               ...features.map((f) {
@@ -428,9 +508,13 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        included ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        included
+                            ? Icons.check_circle_rounded
+                            : Icons.cancel_rounded,
                         size: 15,
-                        color: included ? AppColors.green : context.surfaces.textDim,
+                        color: included
+                            ? AppColors.green
+                            : context.surfaces.textDim,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -463,12 +547,14 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _payingDiamonds != null ? null : () => _buy(diamonds),
+                  onPressed:
+                      _payingDiamonds != null ? null : () => _buy(diamonds),
                   child: isPaying
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : Text(context.tr('buy_btn')),
                 ),
@@ -499,23 +585,33 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.workspaces_rounded, color: Colors.white, size: 20),
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.workspaces_rounded,
+                      color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(context.tr('diamond_enterprise_title'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                      Text(context.tr('diamond_enterprise_title'),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15)),
                       const SizedBox(height: 2),
-                      Text(context.tr('diamond_enterprise_subtitle'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text(context.tr('diamond_enterprise_subtitle'),
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
@@ -523,9 +619,14 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.mail_outline_rounded, color: Colors.white, size: 14),
+                      const Icon(Icons.mail_outline_rounded,
+                          color: Colors.white, size: 14),
                       const SizedBox(width: 5),
-                      Text(context.tr('diamond_enterprise_cta'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                      Text(context.tr('diamond_enterprise_cta'),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12.5)),
                     ],
                   ),
                 ),
@@ -535,11 +636,14 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _enterpriseFeatureRow(context.tr('diamond_enterprise_feature_1')),
+                _enterpriseFeatureRow(
+                    context.tr('diamond_enterprise_feature_1')),
                 const SizedBox(height: 6),
-                _enterpriseFeatureRow(context.tr('diamond_enterprise_feature_2')),
+                _enterpriseFeatureRow(
+                    context.tr('diamond_enterprise_feature_2')),
                 const SizedBox(height: 6),
-                _enterpriseFeatureRow(context.tr('diamond_enterprise_feature_3')),
+                _enterpriseFeatureRow(
+                    context.tr('diamond_enterprise_feature_3')),
               ],
             ),
             const SizedBox(height: 12),
@@ -548,7 +652,8 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.touch_app_rounded, color: Colors.white70, size: 13),
+                const Icon(Icons.touch_app_rounded,
+                    color: Colors.white70, size: 13),
                 const SizedBox(width: 6),
                 Text(
                   context.tr('diamond_support_title'),
@@ -568,7 +673,9 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       children: [
         const Icon(Icons.check_circle_rounded, color: Colors.white, size: 14),
         const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12.5))),
+        Expanded(
+            child: Text(text,
+                style: const TextStyle(color: Colors.white, fontSize: 12.5))),
       ],
     );
   }

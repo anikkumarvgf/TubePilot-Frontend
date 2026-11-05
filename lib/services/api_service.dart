@@ -18,7 +18,7 @@ class ApiException implements Exception {
 /// 2GB file memory mein nahi bharti, aur progress asli network speed ke hisaab se chalta hai.
 class _ProgressMultipartRequest extends http.MultipartRequest {
   final void Function(int sent, int total)? onProgress;
-  _ProgressMultipartRequest(String method, Uri url, {this.onProgress}) : super(method, url);
+  _ProgressMultipartRequest(super.method, super.url, {this.onProgress});
 
   @override
   http.ByteStream finalize() {
@@ -56,16 +56,20 @@ class ApiService {
     http.Response res;
     switch (method) {
       case 'POST':
-        res = await http.post(uri, headers: headers, body: body != null ? jsonEncode(body) : null);
+        res = await http.post(uri,
+            headers: headers, body: body != null ? jsonEncode(body) : null);
         break;
       case 'PATCH':
-        res = await http.patch(uri, headers: headers, body: body != null ? jsonEncode(body) : null);
+        res = await http.patch(uri,
+            headers: headers, body: body != null ? jsonEncode(body) : null);
         break;
       case 'PUT':
-        res = await http.put(uri, headers: headers, body: body != null ? jsonEncode(body) : null);
+        res = await http.put(uri,
+            headers: headers, body: body != null ? jsonEncode(body) : null);
         break;
       case 'DELETE':
-        res = await http.delete(uri, headers: headers, body: body != null ? jsonEncode(body) : null);
+        res = await http.delete(uri,
+            headers: headers, body: body != null ? jsonEncode(body) : null);
         break;
       default:
         res = await http.get(uri, headers: headers);
@@ -80,11 +84,14 @@ class ApiService {
 
     if (res.statusCode == 401 && data['code'] == 'TOKEN_EXPIRED' && retry) {
       final refreshed = await _refreshAccessToken();
-      if (refreshed) return _request(path, method: method, body: body, retry: false);
+      if (refreshed) {
+        return _request(path, method: method, body: body, retry: false);
+      }
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException(data['message'] ?? 'Request failed', status: res.statusCode, code: data['code']);
+      throw ApiException(data['message'] ?? 'Request failed',
+          status: res.statusCode, code: data['code']);
     }
     return data;
   }
@@ -135,11 +142,15 @@ class ApiService {
 
     if (res.statusCode == 401 && data['code'] == 'TOKEN_EXPIRED' && retry) {
       final refreshed = await _refreshAccessToken();
-      if (refreshed) return uploadMultipart(path, fields: fields, files: files, retry: false, method: method);
+      if (refreshed) {
+        return uploadMultipart(path,
+            fields: fields, files: files, retry: false, method: method);
+      }
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException(data['message'] ?? 'Upload failed', status: res.statusCode, code: data['code']);
+      throw ApiException(data['message'] ?? 'Upload failed',
+          status: res.statusCode, code: data['code']);
     }
     return data;
   }
@@ -162,7 +173,8 @@ class ApiService {
       onProgress: onProgress,
     );
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(await http.MultipartFile.fromPath(fieldName, filePath, contentType: contentType));
+    request.files.add(await http.MultipartFile.fromPath(fieldName, filePath,
+        contentType: contentType));
 
     final streamed = await request.send();
     final res = await http.Response.fromStream(streamed);
@@ -189,26 +201,35 @@ class ApiService {
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw ApiException(data['message'] ?? 'Upload failed', status: res.statusCode, code: data['code']);
+      throw ApiException(data['message'] ?? 'Upload failed',
+          status: res.statusCode, code: data['code']);
     }
     return data;
   }
 
   // ---------------- Auth ----------------
   // ------ POST /api/auth/signup ------ //
-  Future<Map<String, dynamic>> signup({required String name, required String email, required String password}) =>
-      _request('/auth/signup', method: 'POST', body: {'name': name, 'email': email, 'password': password});
+  Future<Map<String, dynamic>> signup(
+          {required String name,
+          required String email,
+          required String password}) =>
+      _request('/auth/signup',
+          method: 'POST',
+          body: {'name': name, 'email': email, 'password': password});
 
   // ------ POST /api/auth/login ------ //
-  Future<Map<String, dynamic>> login({required String email, required String password}) =>
-      _request('/auth/login', method: 'POST', body: {'email': email, 'password': password});
+  Future<Map<String, dynamic>> login(
+          {required String email, required String password}) =>
+      _request('/auth/login',
+          method: 'POST', body: {'email': email, 'password': password});
 
   // ------ POST /api/auth/google ------ //
   Future<Map<String, dynamic>> googleLogin(String idToken) =>
       _request('/auth/google', method: 'POST', body: {'idToken': idToken});
 
   // ------ POST /api/auth/logout ------ //
-  Future<Map<String, dynamic>> logout() => _request('/auth/logout', method: 'POST');
+  Future<Map<String, dynamic>> logout() =>
+      _request('/auth/logout', method: 'POST');
 
   // ------ POST /api/auth/forgot-password ------ //
   Future<Map<String, dynamic>> forgotPassword(String email) =>
@@ -218,7 +239,10 @@ class ApiService {
   Future<Map<String, dynamic>> me() => _request('/auth/me');
 
   // ------ POST /api/auth/setup-username ------ //
-  Future<Map<String, dynamic>> setupUsername({required String username, required String language, String? avatar}) =>
+  Future<Map<String, dynamic>> setupUsername(
+          {required String username,
+          required String language,
+          String? avatar}) =>
       _request('/auth/setup-username', method: 'POST', body: {
         'username': username,
         'language': language,
@@ -227,10 +251,12 @@ class ApiService {
 
   // ------ POST /api/auth/apply-referral ------ //
   Future<Map<String, dynamic>> applyReferralCode(String referralCode) =>
-      _request('/auth/apply-referral', method: 'POST', body: {'referralCode': referralCode});
+      _request('/auth/apply-referral',
+          method: 'POST', body: {'referralCode': referralCode});
 
   // ------ DELETE /api/auth/delete-account ------ //
-  Future<Map<String, dynamic>> deleteMyAccount() => _request('/auth/delete-account', method: 'DELETE');
+  Future<Map<String, dynamic>> deleteMyAccount() =>
+      _request('/auth/delete-account', method: 'DELETE');
 
   // ---------------- Dashboard ----------------
   // ------ GET /api/dashboard ------ //
@@ -238,17 +264,21 @@ class ApiService {
 
   // ---------------- YouTube (backend/routes/youtube.js) ----------------
   // ------ GET /api/youtube/oauth/url ------ //
-  Future<Map<String, dynamic>> getYoutubeOAuthUrl() => _request('/youtube/oauth/url?platform=mobile');
+  Future<Map<String, dynamic>> getYoutubeOAuthUrl() =>
+      _request('/youtube/oauth/url?platform=mobile');
   // ------ GET /api/youtube/channel ------ //
-  Future<Map<String, dynamic>> getYoutubeChannel() => _request('/youtube/channel');
+  Future<Map<String, dynamic>> getYoutubeChannel() =>
+      _request('/youtube/channel');
   // ------ DELETE /api/youtube/disconnect ------ //
-  Future<Map<String, dynamic>> disconnectYoutube() => _request('/youtube/disconnect', method: 'DELETE');
+  Future<Map<String, dynamic>> disconnectYoutube() =>
+      _request('/youtube/disconnect', method: 'DELETE');
 
   // "Apply to Video" reaching already-published channel videos + "My Videos" screen —
   // real channel videos straight from YouTube, not just TubePilot's own queued uploads.
   // ------ GET /api/youtube/my-videos ------ //
   // `max` (default 25, backend caps at 100) - SEO / thumbnail screens ask for 100.
-  Future<Map<String, dynamic>> getMyYoutubeVideos({int max = 25}) => _request('/youtube/my-videos?max=$max');
+  Future<Map<String, dynamic>> getMyYoutubeVideos({int max = 25}) =>
+      _request('/youtube/my-videos?max=$max');
 
   // ------ PATCH /api/youtube/my-videos/:videoId ------ //
   Future<Map<String, dynamic>> updateYoutubeVideoMetadata(
@@ -264,10 +294,13 @@ class ApiService {
       });
 
   // ------ PATCH /api/youtube/my-videos/:videoId/thumbnail ------ //
-  Future<Map<String, dynamic>> updateYoutubeThumbnail(String videoId, String thumbnailPath) async {
+  Future<Map<String, dynamic>> updateYoutubeThumbnail(
+      String videoId, String thumbnailPath) async {
     final mime = _lookupMimeOrDefault(thumbnailPath, 'image/jpeg');
-    final file = await http.MultipartFile.fromPath('thumbnail', thumbnailPath, contentType: mime);
-    return uploadMultipart('/youtube/my-videos/$videoId/thumbnail', method: 'PATCH', fields: {}, files: [file]);
+    final file = await http.MultipartFile.fromPath('thumbnail', thumbnailPath,
+        contentType: mime);
+    return uploadMultipart('/youtube/my-videos/$videoId/thumbnail',
+        method: 'PATCH', fields: {}, files: [file]);
   }
 
   // ------ DELETE /api/youtube/my-videos/:videoId ------ //
@@ -277,7 +310,8 @@ class ApiService {
   // ---------------- Meta (Facebook + Instagram) ----------------
   // One OAuth flow + one status check covers BOTH platforms.
   // ------ GET /api/meta/oauth/url ------ //
-  Future<Map<String, dynamic>> getMetaOAuthUrl() => _request('/meta/oauth/url?platform=mobile');
+  Future<Map<String, dynamic>> getMetaOAuthUrl() =>
+      _request('/meta/oauth/url?platform=mobile');
   // ------ GET /api/meta/status ------ //
   Future<Map<String, dynamic>> getMetaStatus() => _request('/meta/status');
   // ------ GET /api/meta/pages ------ //
@@ -286,7 +320,8 @@ class ApiService {
   Future<Map<String, dynamic>> selectMetaPage(String pageId) =>
       _request('/meta/select-page', method: 'PATCH', body: {'pageId': pageId});
   // ------ DELETE /api/meta/facebook/disconnect ------ //
-  Future<Map<String, dynamic>> disconnectFacebook() => _request('/meta/facebook/disconnect', method: 'DELETE');
+  Future<Map<String, dynamic>> disconnectFacebook() =>
+      _request('/meta/facebook/disconnect', method: 'DELETE');
 
   // ---------------- Videos (backend/routes/video.js — multi-platform) ----------------
   // ------ POST /api/videos/upload ------ //
@@ -299,15 +334,18 @@ class ApiService {
     Map<String, dynamic>? youtube,
     Map<String, dynamic>? facebook,
     Map<String, dynamic>? instagram,
-    bool autoSlot = false, // scheduled upload, let the server pick the best time (needs Auto-Slotting ON)
+    bool autoSlot =
+        false, // scheduled upload, let the server pick the best time (needs Auto-Slotting ON)
   }) async {
     final videoMime = _lookupMimeOrDefault(videoPath, 'video/mp4');
     final files = [
-      await http.MultipartFile.fromPath('video', videoPath, contentType: videoMime),
+      await http.MultipartFile.fromPath('video', videoPath,
+          contentType: videoMime),
     ];
     if (thumbnailPath != null) {
       final thumbMime = _lookupMimeOrDefault(thumbnailPath, 'image/jpeg');
-      files.add(await http.MultipartFile.fromPath('thumbnail', thumbnailPath, contentType: thumbMime));
+      files.add(await http.MultipartFile.fromPath('thumbnail', thumbnailPath,
+          contentType: thumbMime));
     }
 
     final fields = <String, String>{
@@ -337,7 +375,8 @@ class ApiService {
     final files = <http.MultipartFile>[];
     for (final path in videoPaths) {
       final mime = _lookupMimeOrDefault(path, 'video/mp4');
-      files.add(await http.MultipartFile.fromPath('videos', path, contentType: mime));
+      files.add(
+          await http.MultipartFile.fromPath('videos', path, contentType: mime));
     }
 
     final fields = <String, String>{
@@ -353,9 +392,11 @@ class ApiService {
 
   // ------ GET / PATCH /api/videos/auto-slotting ------ //
   // GET -> { enabled, nextSlot (ISO|null), videosUsed, reason }
-  Future<Map<String, dynamic>> getAutoSlotting() => _request('/videos/auto-slotting');
+  Future<Map<String, dynamic>> getAutoSlotting() =>
+      _request('/videos/auto-slotting');
   Future<Map<String, dynamic>> setAutoSlotting(bool enabled) =>
-      _request('/videos/auto-slotting', method: 'PATCH', body: {'enabled': enabled});
+      _request('/videos/auto-slotting',
+          method: 'PATCH', body: {'enabled': enabled});
 
   // "My Videos" screen: single combined list (TubePilot DB records + real live YouTube videos).
   // MUST be called as its own path — do not confuse with listVideos() below.
@@ -368,10 +409,13 @@ class ApiService {
   // ------ GET /api/videos/:id ------ //
   Future<Map<String, dynamic>> getVideo(String id) => _request('/videos/$id');
   // ------ PATCH /api/videos/:id/schedule/:platform ------ //
-  Future<Map<String, dynamic>> scheduleVideoPlatform(String id, String platform, String scheduledAt) =>
-      _request('/videos/$id/schedule/$platform', method: 'PATCH', body: {'scheduledAt': scheduledAt});
+  Future<Map<String, dynamic>> scheduleVideoPlatform(
+          String id, String platform, String scheduledAt) =>
+      _request('/videos/$id/schedule/$platform',
+          method: 'PATCH', body: {'scheduledAt': scheduledAt});
   // ------ DELETE /api/videos/:id ------ //
-  Future<Map<String, dynamic>> cancelVideo(String id) => _request('/videos/$id', method: 'DELETE');
+  Future<Map<String, dynamic>> cancelVideo(String id) =>
+      _request('/videos/$id', method: 'DELETE');
   // ------ PATCH /api/videos/:id/metadata ------ //
   Future<Map<String, dynamic>> updateVideoMetadata(
     String id, {
@@ -392,10 +436,13 @@ class ApiService {
       });
 
   // ------ PATCH /api/videos/:id/thumbnail ------ //
-  Future<Map<String, dynamic>> updateDbVideoThumbnail(String id, String thumbnailPath) async {
+  Future<Map<String, dynamic>> updateDbVideoThumbnail(
+      String id, String thumbnailPath) async {
     final mime = _lookupMimeOrDefault(thumbnailPath, 'image/jpeg');
-    final file = await http.MultipartFile.fromPath('thumbnail', thumbnailPath, contentType: mime);
-    return uploadMultipart('/videos/$id/thumbnail', method: 'PATCH', fields: {}, files: [file]);
+    final file = await http.MultipartFile.fromPath('thumbnail', thumbnailPath,
+        contentType: mime);
+    return uploadMultipart('/videos/$id/thumbnail',
+        method: 'PATCH', fields: {}, files: [file]);
   }
 
   // ---------------- Diamonds (PayU) ----------------
@@ -407,15 +454,28 @@ class ApiService {
   //   3. verifyPayuPayment()— after checkout closes; backend re-confirms directly with PayU's
   //                           server before crediting diamonds — never trust the SDK alone.
   // ------ GET /api/diamonds/packages ------ //
-  Future<Map<String, dynamic>> getDiamondPackages() => _request('/diamonds/packages');
+  Future<Map<String, dynamic>> getDiamondPackages() =>
+      _request('/diamonds/packages');
+
+  // ------ POST /api/diamonds/cashfree/create-order ------ //
+  Future<Map<String, dynamic>> createCashfreeOrder(int diamondPackage) =>
+      _request('/diamonds/cashfree/create-order',
+          method: 'POST', body: {'diamondPackage': diamondPackage});
+
+  // ------ POST /api/diamonds/cashfree/verify-payment ------ //
+  Future<Map<String, dynamic>> verifyCashfreePayment(String orderId) =>
+      _request('/diamonds/cashfree/verify-payment',
+          method: 'POST', body: {'orderId': orderId});
 
   // ------ POST /api/diamonds/create-order ------ //
   Future<Map<String, dynamic>> createPayuOrder(int diamondPackage) =>
-      _request('/diamonds/create-order', method: 'POST', body: {'diamondPackage': diamondPackage});
+      _request('/diamonds/create-order',
+          method: 'POST', body: {'diamondPackage': diamondPackage});
 
   // ------ POST /api/diamonds/verify-payment ------ //
   Future<Map<String, dynamic>> verifyPayuPayment(String orderId) =>
-      _request('/diamonds/verify-payment', method: 'POST', body: {'orderId': orderId});
+      _request('/diamonds/verify-payment',
+          method: 'POST', body: {'orderId': orderId});
 
   // ------ POST /api/diamonds/payu/hash ------ //
   Future<Map<String, dynamic>> payuHash({
@@ -433,29 +493,37 @@ class ApiService {
 
   // ---------------- Subscription (Rs1 intro, then Rs10/month autopay via PayU SI) ----------------
   // ------ GET /api/subscription/status ------ //
-  Future<Map<String, dynamic>> getSubscriptionStatus() => _request('/subscription/status');
+  Future<Map<String, dynamic>> getSubscriptionStatus() =>
+      _request('/subscription/status');
   // ------ POST /api/subscription/start ------ //   -> { orderId, payu, si }
-  Future<Map<String, dynamic>> startSubscription() => _request('/subscription/start', method: 'POST');
+  Future<Map<String, dynamic>> startSubscription() =>
+      _request('/subscription/start', method: 'POST');
   // ------ POST /api/subscription/verify ------ //
   Future<Map<String, dynamic>> verifySubscriptionPayment(String orderId) =>
-      _request('/subscription/verify', method: 'POST', body: {'orderId': orderId});
+      _request('/subscription/verify',
+          method: 'POST', body: {'orderId': orderId});
   // ------ POST /api/subscription/cancel ------ //
-  Future<Map<String, dynamic>> cancelSubscription() => _request('/subscription/cancel', method: 'POST');
+  Future<Map<String, dynamic>> cancelSubscription() =>
+      _request('/subscription/cancel', method: 'POST');
 
   // ------ GET /api/diamonds/my-requests ------ //
-  Future<Map<String, dynamic>> myPurchaseRequests() => _request('/diamonds/my-requests');
+  Future<Map<String, dynamic>> myPurchaseRequests() =>
+      _request('/diamonds/my-requests');
 
   // ---------------- Live Streaming Plans (Day Pass / Month Pass) - paid via PayU ----------------
   // ------ GET /api/live-plans ------ //
   Future<Map<String, dynamic>> getLivePlans() => _request('/live-plans');
 
   // ------ POST /api/live-plans/create-order ------ //
-  Future<Map<String, dynamic>> createLivePlanOrder({required String category, required String planName}) =>
-      _request('/live-plans/create-order', method: 'POST', body: {'category': category, 'planName': planName});
+  Future<Map<String, dynamic>> createLivePlanOrder(
+          {required String category, required String planName}) =>
+      _request('/live-plans/create-order',
+          method: 'POST', body: {'category': category, 'planName': planName});
 
   // ------ POST /api/live-plans/verify-payment ------ //
   Future<Map<String, dynamic>> verifyLivePlanPayment(String orderId) =>
-      _request('/live-plans/verify-payment', method: 'POST', body: {'orderId': orderId});
+      _request('/live-plans/verify-payment',
+          method: 'POST', body: {'orderId': orderId});
 
   // ---------------- Live Streaming (upload + start/stop/status) ----------------
   // ------ POST /api/live-stream/upload-video ------ //
@@ -474,7 +542,8 @@ class ApiService {
   }
 
   // ------ POST /api/live-stream/start ------ //
-  Future<Map<String, dynamic>> startLiveStream({required String videoUrl, String? title, String? description}) =>
+  Future<Map<String, dynamic>> startLiveStream(
+          {required String videoUrl, String? title, String? description}) =>
       _request('/live-stream/start', method: 'POST', body: {
         'videoUrl': videoUrl,
         if (title != null) 'title': title,
@@ -483,7 +552,8 @@ class ApiService {
 
   // ------ POST /api/live-stream/start-camera ------ //
   // Phone camera se live. Response: { streamId, rtmpUrl, streamKey, watchUrl, secondsAllowed, isFreeTrial, ... }
-  Future<Map<String, dynamic>> startCameraLive({String? title, String? description}) =>
+  Future<Map<String, dynamic>> startCameraLive(
+          {String? title, String? description}) =>
       _request('/live-stream/start-camera', method: 'POST', body: {
         if (title != null) 'title': title,
         if (description != null) 'description': description,
@@ -491,52 +561,71 @@ class ApiService {
 
   // ------ POST /api/live-stream/stop ------ //
   Future<Map<String, dynamic>> stopLiveStream(String streamId) =>
-      _request('/live-stream/stop', method: 'POST', body: {'streamId': streamId});
+      _request('/live-stream/stop',
+          method: 'POST', body: {'streamId': streamId});
 
   // ------ GET /api/live-stream/status/:streamId ------ //
-  Future<Map<String, dynamic>> getLiveStreamStatus(String streamId) => _request('/live-stream/status/$streamId');
+  Future<Map<String, dynamic>> getLiveStreamStatus(String streamId) =>
+      _request('/live-stream/status/$streamId');
 
   // ---------------- Wallet ----------------
   // ------ GET /api/wallet ------ //
   Future<Map<String, dynamic>> getWallet() => _request('/wallet');
 
   // Real auto-refund history (days = 7 | 30 | 90).
-  Future<Map<String, dynamic>> getRefundLogs({int days = 30}) => _request('/wallet/refunds?days=$days');
+  Future<Map<String, dynamic>> getRefundLogs({int days = 30}) =>
+      _request('/wallet/refunds?days=$days');
 
   // ---------------- AI (platform-aware) ----------------
   // ------ POST /api/ai/title ------ //
-  Future<Map<String, dynamic>> aiTitle(String topic) => _request('/ai/title', method: 'POST', body: {'topic': topic});
+  Future<Map<String, dynamic>> aiTitle(String topic) =>
+      _request('/ai/title', method: 'POST', body: {'topic': topic});
   // ------ POST /api/ai/title-options ------ //
   Future<Map<String, dynamic>> aiTitleOptions(String topic, {int count = 5}) =>
-      _request('/ai/title-options', method: 'POST', body: {'topic': topic, 'count': count});
+      _request('/ai/title-options',
+          method: 'POST', body: {'topic': topic, 'count': count});
   // ------ POST /api/ai/description ------ //
   Future<Map<String, dynamic>> aiDescription(String topic) =>
       _request('/ai/description', method: 'POST', body: {'topic': topic});
   // ------ POST /api/ai/description-options ------ //
-  Future<Map<String, dynamic>> aiDescriptionOptions(String topic, {int count = 4}) =>
-      _request('/ai/description-options', method: 'POST', body: {'topic': topic, 'count': count});
+  Future<Map<String, dynamic>> aiDescriptionOptions(String topic,
+          {int count = 4}) =>
+      _request('/ai/description-options',
+          method: 'POST', body: {'topic': topic, 'count': count});
 
   // ⚠️ NEW: Video SEO Optimizer versions of the two calls above. Same result,
   // but the SERVER only allows them for users with a paid pack (402
   // PLAN_UPGRADE_REQUIRED otherwise), so a free user can't bypass the blur.
   // ------ POST /api/ai/seo-title-options ------ //
-  Future<Map<String, dynamic>> aiSeoTitleOptions(String topic, {int count = 5}) =>
-      _request('/ai/seo-title-options', method: 'POST', body: {'topic': topic, 'count': count});
+  Future<Map<String, dynamic>> aiSeoTitleOptions(String topic,
+          {int count = 5}) =>
+      _request('/ai/seo-title-options',
+          method: 'POST', body: {'topic': topic, 'count': count});
   // ------ POST /api/ai/seo-description-options ------ //
-  Future<Map<String, dynamic>> aiSeoDescriptionOptions(String topic, {int count = 3}) =>
-      _request('/ai/seo-description-options', method: 'POST', body: {'topic': topic, 'count': count});
+  Future<Map<String, dynamic>> aiSeoDescriptionOptions(String topic,
+          {int count = 3}) =>
+      _request('/ai/seo-description-options',
+          method: 'POST', body: {'topic': topic, 'count': count});
 
   // ------ POST /api/ai/tags ------ //
-  Future<Map<String, dynamic>> aiTags(String topic) => _request('/ai/tags', method: 'POST', body: {'topic': topic});
+  Future<Map<String, dynamic>> aiTags(String topic) =>
+      _request('/ai/tags', method: 'POST', body: {'topic': topic});
   // ------ POST /api/ai/caption ------ //
   Future<Map<String, dynamic>> aiCaption(String topic, String platform) =>
-      _request('/ai/caption', method: 'POST', body: {'topic': topic, 'platform': platform});
+      _request('/ai/caption',
+          method: 'POST', body: {'topic': topic, 'platform': platform});
   // ------ POST /api/ai/hashtags ------ //
   Future<Map<String, dynamic>> aiHashtags(String topic, String platform) =>
-      _request('/ai/hashtags', method: 'POST', body: {'topic': topic, 'platform': platform});
+      _request('/ai/hashtags',
+          method: 'POST', body: {'topic': topic, 'platform': platform});
   // ------ POST /api/ai/ideas ------ //
-  Future<Map<String, dynamic>> aiIdeas({required String niche, String platform = 'youtube', int count = 5}) =>
-      _request('/ai/ideas', method: 'POST', body: {'niche': niche, 'platform': platform, 'count': count});
+  Future<Map<String, dynamic>> aiIdeas(
+          {required String niche,
+          String platform = 'youtube',
+          int count = 5}) =>
+      _request('/ai/ideas',
+          method: 'POST',
+          body: {'niche': niche, 'platform': platform, 'count': count});
   // ------ POST /api/ai/seo-score ------ //
   Future<Map<String, dynamic>> aiSeoScore({
     required String title,
@@ -553,15 +642,17 @@ class ApiService {
 
   // ---------------- Analytics: Competitors & Audit (backend/routes/analytics.js) ----------------
   // ------ GET /api/analytics/competitors ------ //
-  Future<Map<String, dynamic>> listCompetitors() => _request('/analytics/competitors');
+  Future<Map<String, dynamic>> listCompetitors() =>
+      _request('/analytics/competitors');
 
   /// Live channel-name search for the Competitor Radar "add competitor" autocomplete.
   // ------ GET /api/analytics/competitors/search ------ //
-  Future<Map<String, dynamic>> searchCompetitors(String query) =>
-      _request('/analytics/competitors/search?q=${Uri.encodeQueryComponent(query)}');
+  Future<Map<String, dynamic>> searchCompetitors(String query) => _request(
+      '/analytics/competitors/search?q=${Uri.encodeQueryComponent(query)}');
 
   // ------ POST /api/analytics/competitors ------ //
-  Future<Map<String, dynamic>> addCompetitor({String? channelId, String? handle, String? label}) =>
+  Future<Map<String, dynamic>> addCompetitor(
+          {String? channelId, String? handle, String? label}) =>
       _request('/analytics/competitors', method: 'POST', body: {
         if (channelId != null) 'channelId': channelId,
         if (handle != null) 'handle': handle,
@@ -580,7 +671,8 @@ class ApiService {
       _request('/analytics/competitors/$id');
 
   // ------ GET /api/analytics/competitors/videos?sort= (or /:id/videos) ------ //
-  Future<Map<String, dynamic>> getCompetitorVideos({String? competitorId, String sort = 'most_viewed', int limit = 30}) {
+  Future<Map<String, dynamic>> getCompetitorVideos(
+      {String? competitorId, String sort = 'most_viewed', int limit = 30}) {
     final base = competitorId == null
         ? '/analytics/competitors/videos'
         : '/analytics/competitors/$competitorId/videos';
@@ -591,11 +683,13 @@ class ApiService {
   Future<Map<String, dynamic>> getCompetitorVideoDetails(String videoId) =>
       _request('/analytics/competitors/video/$videoId');
   // ------ GET /api/analytics/audit ------ //
-  Future<Map<String, dynamic>> getChannelAudit() => _request('/analytics/audit');
+  Future<Map<String, dynamic>> getChannelAudit() =>
+      _request('/analytics/audit');
 
   // ---------------- Milestones ----------------
   // ------ GET /api/milestones/pending ------ //
-  Future<Map<String, dynamic>> getPendingMilestone() => _request('/milestones/pending');
+  Future<Map<String, dynamic>> getPendingMilestone() =>
+      _request('/milestones/pending');
   // ------ POST /api/milestones/:id/seen ------ //
   Future<Map<String, dynamic>> markMilestoneSeen(String id) =>
       _request('/milestones/$id/seen', method: 'POST');
@@ -607,13 +701,16 @@ class ApiService {
   Future<Map<String, dynamic>> markNotificationRead(String id) =>
       _request('/notifications/$id/read', method: 'PATCH');
   // ------ PATCH /api/notifications/read-all ------ //
-  Future<Map<String, dynamic>> markAllNotificationsRead() => _request('/notifications/read-all', method: 'PATCH');
+  Future<Map<String, dynamic>> markAllNotificationsRead() =>
+      _request('/notifications/read-all', method: 'PATCH');
   // ------ POST /api/notifications/register-device ------ //
   Future<Map<String, dynamic>> registerDeviceToken(String fcmToken) =>
-      _request('/notifications/register-device', method: 'POST', body: {'fcmToken': fcmToken});
+      _request('/notifications/register-device',
+          method: 'POST', body: {'fcmToken': fcmToken});
   // ------ POST /api/notifications/register-onesignal-player ------ //
   Future<Map<String, dynamic>> registerOneSignalPlayerId(String playerId) =>
-      _request('/notifications/register-onesignal-player', method: 'POST', body: {'playerId': playerId});
+      _request('/notifications/register-onesignal-player',
+          method: 'POST', body: {'playerId': playerId});
 
   // ------ DELETE /api/notifications/:id ------ //
   Future<Map<String, dynamic>> deleteNotification(String id) =>
@@ -631,12 +728,19 @@ class ApiService {
   // ------ GET /api/ratings/status ------ //
   Future<Map<String, dynamic>> getRatingStatus() => _request('/ratings/status');
   // ------ GET /api/ratings/suggest ------ //
-  Future<Map<String, dynamic>> suggestRatingReview(int stars) => _request('/ratings/suggest?stars=$stars');
+  Future<Map<String, dynamic>> suggestRatingReview(int stars) =>
+      _request('/ratings/suggest?stars=$stars');
   // ------ POST /api/ratings ------ //
-  Future<Map<String, dynamic>> submitRating({required int stars, required String reviewText, required String email}) =>
-      _request('/ratings', method: 'POST', body: {'stars': stars, 'reviewText': reviewText, 'email': email});
+  Future<Map<String, dynamic>> submitRating(
+          {required int stars,
+          required String reviewText,
+          required String email}) =>
+      _request('/ratings',
+          method: 'POST',
+          body: {'stars': stars, 'reviewText': reviewText, 'email': email});
   // ------ POST /api/ratings/dismiss ------ //
-  Future<Map<String, dynamic>> dismissRating() => _request('/ratings/dismiss', method: 'POST');
+  Future<Map<String, dynamic>> dismissRating() =>
+      _request('/ratings/dismiss', method: 'POST');
   // ------ GET /api/ratings/mine ------ //
   Future<Map<String, dynamic>> getMyRating() => _request('/ratings/mine');
 
@@ -647,12 +751,15 @@ class ApiService {
   Future<Map<String, dynamic>> adminPayments({String? status}) =>
       _request('/admin/payments${status != null ? '?status=$status' : ''}');
   // ------ PATCH /api/admin/payments/:id/approve ------ //
-  Future<Map<String, dynamic>> approvePayment(String id) => _request('/admin/payments/$id/approve', method: 'PATCH');
+  Future<Map<String, dynamic>> approvePayment(String id) =>
+      _request('/admin/payments/$id/approve', method: 'PATCH');
   // ------ PATCH /api/admin/payments/:id/reject ------ //
   Future<Map<String, dynamic>> rejectPayment(String id, String note) =>
-      _request('/admin/payments/$id/reject', method: 'PATCH', body: {'note': note});
+      _request('/admin/payments/$id/reject',
+          method: 'PATCH', body: {'note': note});
   // ------ GET /api/admin/payment-settings ------ //
-  Future<Map<String, dynamic>> getAdminPaymentSettings() => _request('/admin/payment-settings');
+  Future<Map<String, dynamic>> getAdminPaymentSettings() =>
+      _request('/admin/payment-settings');
 
   // ------ GET /api/admin/users ------ //
   Future<Map<String, dynamic>> adminUsers({String? search}) => _request(
@@ -667,24 +774,28 @@ class ApiService {
       _request('/admin/users/$id/toggle-active', method: 'PATCH');
 
   // ------ DELETE /api/admin/users/:id ------ //
-  Future<Map<String, dynamic>> deleteUserAccount(String id) => _request('/admin/users/$id', method: 'DELETE');
+  Future<Map<String, dynamic>> deleteUserAccount(String id) =>
+      _request('/admin/users/$id', method: 'DELETE');
 
   // ---------------- Gift Codes ----------------
   // ------ POST /api/admin/gift-codes ------ //
-  Future<Map<String, dynamic>> adminCreateGiftCode({String? code, required int diamondValue, String? label}) =>
+  Future<Map<String, dynamic>> adminCreateGiftCode(
+          {String? code, required int diamondValue, String? label}) =>
       _request('/admin/gift-codes', method: 'POST', body: {
         if (code != null) 'code': code,
         'diamondValue': diamondValue,
         if (label != null) 'label': label,
       });
   // ------ GET /api/admin/gift-codes ------ //
-  Future<Map<String, dynamic>> adminListGiftCodes() => _request('/admin/gift-codes');
+  Future<Map<String, dynamic>> adminListGiftCodes() =>
+      _request('/admin/gift-codes');
   // ------ PATCH /api/admin/gift-codes/:id/toggle-active ------ //
   Future<Map<String, dynamic>> adminToggleGiftCode(String id) =>
       _request('/admin/gift-codes/$id/toggle-active', method: 'PATCH');
   // ------ POST /api/diamonds/redeem-gift-code ------ //
   Future<Map<String, dynamic>> redeemGiftCode(String code) =>
-      _request('/diamonds/redeem-gift-code', method: 'POST', body: {'code': code});
+      _request('/diamonds/redeem-gift-code',
+          method: 'POST', body: {'code': code});
 
   // ------ PATCH /api/admin/payment-settings ------ //
   Future<Map<String, dynamic>> updatePaymentSettings({
@@ -716,8 +827,12 @@ class ApiService {
   http.MediaType _lookupMimeOrDefault(String path, String fallback) {
     final ext = path.split('.').last.toLowerCase();
     const map = {
-      'mp4': 'video/mp4', 'mov': 'video/quicktime', 'mkv': 'video/x-matroska',
-      'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'mkv': 'video/x-matroska',
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
     };
     final full = map[ext] ?? fallback;
     final parts = full.split('/');

@@ -6,8 +6,8 @@ import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../providers/language_provider.dart';
 import '../widgets/app_brand_background.dart';
-import '../widgets/diwali_decor.dart';
-import '../widgets/diwali_popups.dart';
+import '../widgets/app_decor.dart';
+import '../widgets/app_popups.dart';
 
 /// Checks the backend for whether the weekly Rate Us prompt should be shown,
 /// and if so, presents it as a bottom sheet. Safe to call after any screen
@@ -17,11 +17,11 @@ Future<void> maybeShowRateUsPopup(BuildContext context) async {
     final res = await ApiService.instance.getRatingStatus();
     if (res['shouldShow'] != true) return;
     if (!context.mounted) return;
-    // Diwali cream popup (same RateUsBody inside DiwaliPopupShell).
+    // Popup (same RateUsBody inside AppPopupShell).
     await showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (dialogContext) => DiwaliPopupShell(
+      builder: (dialogContext) => AppPopupShell(
         onClose: () => Navigator.of(dialogContext).maybePop(),
         padding: const EdgeInsets.fromLTRB(10, 22, 10, 6),
         child: const RateUsBody(isPopup: true),
@@ -149,12 +149,12 @@ class _RateUsBodyState extends State<RateUsBody> {
     if (mounted) Navigator.of(context).maybePop();
   }
 
-  // Popup = Diwali cream colours; full page = app theme as before.
+  // Popup = app popup colours; full page = app theme as before.
   bool get _p => widget.isPopup;
-  Color get _text => _p ? DiwaliColors.purpleDark : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black);
-  Color get _dim => _p ? DiwaliColors.textDim : context.surfaces.textDim;
-  Color get _accent => _p ? DiwaliColors.purple : AppColors.purple;
-  Color get _starOn => _p ? DiwaliColors.gold : AppColors.diamond;
+  Color get _text => _p ? UiColors.purpleDark : (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.black);
+  Color get _dim => _p ? UiColors.textDim : context.surfaces.textDim;
+  Color get _accent => _p ? UiColors.purple : AppColors.purple;
+  Color get _starOn => _p ? UiColors.gold : AppColors.diamond;
 
   InputDecoration _deco({String? hint, Widget? prefix}) {
     if (!_p) return InputDecoration(hintText: hint, prefixIcon: prefix);
@@ -163,13 +163,13 @@ class _RateUsBodyState extends State<RateUsBody> {
     return InputDecoration(
       hintText: hint,
       prefixIcon: prefix,
-      hintStyle: const TextStyle(color: DiwaliColors.textDim, fontSize: 13),
+      hintStyle: const TextStyle(color: UiColors.textDim, fontSize: 13),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.7),
-      counterStyle: const TextStyle(color: DiwaliColors.textDim),
-      border: b(DiwaliColors.cardBorder),
-      enabledBorder: b(DiwaliColors.cardBorder),
-      focusedBorder: b(DiwaliColors.purple, 1.4),
+      counterStyle: const TextStyle(color: UiColors.textDim),
+      border: b(UiColors.cardBorder),
+      enabledBorder: b(UiColors.cardBorder),
+      focusedBorder: b(UiColors.purple, 1.4),
     );
   }
 
@@ -178,7 +178,7 @@ class _RateUsBodyState extends State<RateUsBody> {
     if (_loadingExisting) {
       return const Padding(
         padding: EdgeInsets.all(40),
-        child: Center(child: CircularProgressIndicator(color: DiwaliColors.purple)),
+        child: Center(child: CircularProgressIndicator(color: UiColors.purple)),
       );
     }
     if (_savedRating != null) {
@@ -192,11 +192,11 @@ class _RateUsBodyState extends State<RateUsBody> {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              gradient: _p ? const LinearGradient(colors: [DiwaliColors.purple, DiwaliColors.purpleDark]) : AppColors.gradient,
+              gradient: _p ? const LinearGradient(colors: [UiColors.purple, UiColors.purpleDark]) : AppColors.gradient,
               shape: BoxShape.circle,
-              border: _p ? Border.all(color: DiwaliColors.goldLight, width: 1.5) : null,
+              border: _p ? Border.all(color: UiColors.goldLight, width: 1.5) : null,
             ),
-            child: Center(child: Icon(Icons.star_rounded, color: _p ? DiwaliColors.goldLight : Colors.white, size: 30)),
+            child: Center(child: Icon(Icons.star_rounded, color: _p ? UiColors.goldLight : Colors.white, size: 30)),
           ),
           const SizedBox(height: 14),
           Text(context.tr('enjoying_app'), textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _p ? _text : null)),
@@ -257,7 +257,7 @@ class _RateUsBodyState extends State<RateUsBody> {
           ),
           const SizedBox(height: 24),
           if (_p)
-            DiwaliButton(label: context.tr('save_rating'), loading: _submitting, onTap: _submit)
+            AppButton(label: context.tr('save_rating'), loading: _submitting, onTap: _submit)
           else
             GradientButton(label: context.tr('save_rating'), loading: _submitting, onPressed: _submit),
           const SizedBox(height: 10),
@@ -291,7 +291,7 @@ class _RateUsBodyState extends State<RateUsBody> {
             decoration: BoxDecoration(
               color: _p ? Colors.white.withValues(alpha: 0.55) : context.surfaces.card2,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _p ? DiwaliColors.cardBorder : context.surfaces.border),
+              border: Border.all(color: _p ? UiColors.cardBorder : context.surfaces.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

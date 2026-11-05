@@ -3,13 +3,11 @@ import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
 import '../services/storage_service.dart';
 import '../services/push_service.dart';
-import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
-import '../providers/theme_provider.dart';
 import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
-import '../widgets/diwali_decor.dart';
+import '../widgets/app_decor.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -17,8 +15,9 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  // Splash visible for 7 seconds
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
+  // Splash visible for 7 seconds (same as before)
   static const _minSplashDuration = Duration(seconds: 7);
   late final AnimationController _logoController; // scale/fade-in for the logo
   late final Animation<double> _logoScale;
@@ -27,8 +26,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _logoController = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
-    _logoScale = CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack);
+    _logoController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _logoScale =
+        CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack);
     _logoFade = CurvedAnimation(parent: _logoController, curve: Curves.easeIn);
     _logoController.forward();
     // ⚠️ REMOVED (Google Play policy fix): upfront Permission.photos /
@@ -65,6 +66,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       PushService.initAfterLogin();
     } else {
       final onboarded = await StorageService.isOnboarded();
+      if (!mounted) return;
       next = onboarded ? const LoginScreen() : const OnboardingScreen();
     }
     Navigator.of(context).pushReplacement(
@@ -72,9 +74,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     );
   }
 
-  // The real logo lives at assets/splash.png. Used for BOTH the small lockup
-  // mark and the large centered brand mark below, so there's only one source
-  // of truth for "what the TubePilot logo looks like".
+  // The real logo lives at assets/splash.png (single source of truth).
   Widget _realLogo({required double size}) {
     return Image.asset(
       'assets/splash.png',
@@ -82,128 +82,114 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       height: size,
       fit: BoxFit.contain,
       // Fallback only fires if the asset is missing from the project/pubspec.
-      errorBuilder: (_, __, ___) => Icon(Icons.play_arrow_rounded, color: AppColors.purple, size: size * 0.6),
-    );
-  }
-
-  // Faint repeating play-icon pattern. Only used when festival mode is OFF.
-  Widget _watermarkPattern() {
-    return IgnorePointer(
-      child: Opacity(
-        opacity: 0.07,
-        child: GridView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 30,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1,
-          ),
-          itemCount: 32,
-          itemBuilder: (context, index) => Icon(
-            Icons.play_circle_outline_rounded,
-            color: AppColors.purple,
-            size: 42,
-          ),
-        ),
-      ),
+      errorBuilder: (_, __, ___) => Icon(Icons.play_circle_outline_rounded,
+          color: UiColors.purpleDark, size: size * 0.8),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // ⚠️ FIX: Splash used to be excluded from the festival background
-    // (excludeFromFestival + its own opaque off-white Scaffold), so the Diwali
-    // design never showed here.
-    //  * Festival ON  -> the Scaffold is transparent and the global page
-    //    background (Diwali artwork: hanging diyas, flowers) shows through.
-    //    No extra AppBrandBackground wrapper is needed any more — every route
-    //    is already wrapped globally in main.dart.
-    //  * Festival OFF -> exactly the old look (solid off-white + watermark).
-    final festivalOn = context.select<ThemeProvider, bool>((p) => p.festivalBackgroundAsset != null);
-
-    // Festival ON -> fully code-drawn Diwali splash (no PNG). Navigation logic above is untouched.
-    if (festivalOn) return const DiwaliSplashView();
-
+    // Clean white splash: logo, TubePilot wordmark, tagline, spinner + loading text.
     return Scaffold(
-      backgroundColor: festivalOn ? Colors.transparent : const Color(0xFFFAF7FC),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Faint watermark pattern behind everything else (festival OFF only).
-            if (!festivalOn) Positioned.fill(child: _watermarkPattern()),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo lockup: "Tube [real logo] Pilot"
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
+        child: SizedBox.expand(
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ScaleTransition(
+                      scale: _logoScale,
+                      child: FadeTransition(
+                          opacity: _logoFade, child: _realLogo(size: 110)),
+                    ),
+                    const SizedBox(height: 36),
+                    FadeTransition(
                       opacity: _logoFade,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          ShaderMask(
-                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                            child: const Text(
-                              'Tube',
-                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: _realLogo(size: 40),
-                          ),
-                          ShaderMask(
-                            shaderCallback: (bounds) => AppColors.gradient.createShader(bounds),
-                            child: const Text(
-                              'Pilot',
-                              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white),
-                            ),
-                          ),
-                        ],
+                      child: RichText(
+                        text: const TextSpan(
+                          style: TextStyle(
+                              fontSize: 52,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.2),
+                          children: [
+                            TextSpan(
+                                text: 'Tube',
+                                style: TextStyle(color: UiColors.inkBlack)),
+                            TextSpan(
+                                text: 'Pilot',
+                                style: TextStyle(color: UiColors.purple)),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 60),
-                  // Large centered brand mark — real logo only.
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
+                    const SizedBox(height: 6),
+                    FadeTransition(
                       opacity: _logoFade,
-                      child: _realLogo(size: 140),
+                      child: Text(
+                        context.tr('splash_tagline'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w400,
+                            color: UiColors.textDim),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 26),
-                  FadeTransition(
-                    opacity: _logoFade,
-                    child: Text(
-                      context.tr('splash_tagline'),
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.purple, letterSpacing: 0.2),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            // "Powered by TubePilot" centered at the very bottom of the splash.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 18,
-              child: FadeTransition(
-                opacity: _logoFade,
-                child: Center(
-                  child: Text(
-                    context.tr('splash_powered_by'),
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.purple.withValues(alpha: 0.65)),
+              // Spinner + loading text (lower part of the screen).
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: MediaQuery.sizeOf(context).height * 0.17,
+                child: FadeTransition(
+                  opacity: _logoFade,
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 4,
+                            color: UiColors.purple,
+                            backgroundColor: Color(0xFFE9DDF3)),
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        'Loading Your Creative Journey...',
+                        style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w500,
+                            color: UiColors.purpleDark),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
+              // "Powered by TubePilot" centered at the very bottom.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 18,
+                child: FadeTransition(
+                  opacity: _logoFade,
+                  child: Center(
+                    child: Text(
+                      context.tr('splash_powered_by'),
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: UiColors.inkBlack),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

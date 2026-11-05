@@ -36,6 +36,11 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin firebase_messaging, io.flutter.plugins.firebase.messaging.FlutterFirebaseMessagingPlugin", e);
     }
     try {
+      flutterEngine.getPlugins().add(new com.cashfree.flutter_cashfree_pg_sdk.FlutterCashfreePgSdkPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin flutter_cashfree_pg_sdk, com.cashfree.flutter_cashfree_pg_sdk.FlutterCashfreePgSdkPlugin", e);
+    }
+    try {
       flutterEngine.getPlugins().add(new com.github.droibit.flutter.plugins.customtabs.CustomTabsPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin flutter_custom_tabs_android, com.github.droibit.flutter.plugins.customtabs.CustomTabsPlugin", e);

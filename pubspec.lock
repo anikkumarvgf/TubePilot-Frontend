@@ -162,13 +162,13 @@ packages:
     source: hosted
     version: "0.3.5+4"
   crypto:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crypto
-      sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
+      sha256: e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.7"
+    version: "3.0.8"
   csslib:
     dependency: transitive
     description:
@@ -334,6 +334,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.2"
+  flutter_cashfree_pg_sdk:
+    dependency: "direct main"
+    description:
+      name: flutter_cashfree_pg_sdk
+      sha256: af3aa7d989130294a9411620293ed29ae13f53c911af7877aed5c75820ca2fd0
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.6.0+54"
   flutter_custom_tabs:
     dependency: "direct main"
     description:

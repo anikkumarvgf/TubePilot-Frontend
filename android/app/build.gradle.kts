@@ -30,8 +30,8 @@ if (!releaseSigningConfigured) {
 
 android {
     namespace = "com.tubepilot.app"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -42,9 +42,14 @@ android {
     defaultConfig {
         applicationId = "com.tubepilot.app"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
     signingConfigs {
         if (releaseSigningConfigured) {
@@ -58,12 +63,14 @@ android {
     }
     buildTypes {
         debug {
+            isDebuggable = true
             isMinifyEnabled = false
             isShrinkResources = false
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

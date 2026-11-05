@@ -47,8 +47,9 @@ class StorageService {
 
   static Future<Map<String, dynamic>> getAuthRateLimitState() async {
     final raw = await _secureStorage.read(key: _authRateLimitKey);
-    if (raw == null || raw.isEmpty)
+    if (raw == null || raw.isEmpty) {
       return {'failedAttempts': 0, 'lockUntilEpochMs': 0};
+    }
     try {
       final decoded = Map<String, dynamic>.from(
           (jsonDecode(raw) as Map).cast<String, dynamic>());

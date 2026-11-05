@@ -63,6 +63,8 @@ dependencies:
 
   # Payment Gateway (PayU - Diamond Store + Live Plans)
   payu_checkoutpro_flutter: ^1.4.5
+  crypto: ^3.0.8
+  flutter_cashfree_pg_sdk: ^2.6.0+54
 
 dev_dependencies:
   flutter_test:

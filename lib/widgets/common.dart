@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../providers/language_provider.dart';
-import 'diwali_decor.dart';
+import 'app_decor.dart';
 
 // ---------------- Toast ----------------
 // ⚠️ FIX (Boss request — "notification niche se green background me aata
@@ -356,7 +356,7 @@ class StatCard extends StatelessWidget {
   }
 }
 
-// ---------------- Bottom Nav (Diwali cream floating pill) ----------------
+// ---------------- Bottom Nav (floating pill) ----------------
 // Same 5 tabs, same tap behavior. Cream pill + gold border; selected tab gets a
 // soft plum tint with plum icon + label, others show a dim icon with its label.
 class AppBottomNav extends StatelessWidget {
@@ -385,12 +385,12 @@ class AppBottomNav extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [DiwaliColors.cardTop, DiwaliColors.cardBottom],
+              colors: [UiColors.cardTop, UiColors.cardBottom],
             ),
             borderRadius: BorderRadius.circular(33),
-            border: Border.all(color: DiwaliColors.cardBorder.withValues(alpha: 0.9), width: 1),
+            border: Border.all(color: UiColors.cardBorder.withValues(alpha: 0.9), width: 1),
             boxShadow: [
-              BoxShadow(color: DiwaliColors.goldDeep.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
+              BoxShadow(color: UiColors.goldDeep.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
             ],
           ),
           child: Row(
@@ -406,7 +406,7 @@ class AppBottomNav extends StatelessWidget {
                     curve: Curves.easeOut,
                     margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                     decoration: BoxDecoration(
-                      color: selected ? DiwaliColors.purple.withValues(alpha: 0.10) : Colors.transparent,
+                      color: selected ? UiColors.purple.withValues(alpha: 0.10) : Colors.transparent,
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: Column(
@@ -415,7 +415,7 @@ class AppBottomNav extends StatelessWidget {
                       children: [
                         Icon(
                           selected ? item.filled : item.outline,
-                          color: selected ? DiwaliColors.purpleDark : DiwaliColors.mauve,
+                          color: selected ? UiColors.purpleDark : UiColors.mauve,
                           size: 23,
                         ),
                         const SizedBox(height: 2),
@@ -427,7 +427,7 @@ class AppBottomNav extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                              color: selected ? DiwaliColors.purpleDark : DiwaliColors.purpleDeep.withValues(alpha: 0.75),
+                              color: selected ? UiColors.purpleDark : UiColors.purpleDeep.withValues(alpha: 0.75),
                             ),
                           ),
                         ),

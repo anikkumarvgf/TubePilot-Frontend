@@ -9,7 +9,8 @@ class AdminScreen extends StatefulWidget {
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStateMixin {
+class _AdminScreenState extends State<AdminScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Map<String, dynamic>? stats;
   bool loading = true;
@@ -18,7 +19,13 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   // entirely — since diamond purchases now go through Cashfree's in-app
   // checkout SDK (see diamond_store_screen.dart + backend routes/diamond.js),
   // there is no more UPI ID or QR code for admins to configure. Down to 4 tabs.
-  final tabLabels = const ['Pending', 'Approved', 'Rejected', 'Users', 'Gift Codes'];
+  final tabLabels = const [
+    'Pending',
+    'Approved',
+    'Rejected',
+    'Users',
+    'Gift Codes'
+  ];
   final tabIcons = const [
     Icons.hourglass_top_rounded,
     Icons.check_circle_outline_rounded,
@@ -96,8 +103,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
-  void _invalidatePayments() => paymentsLoadedStatuses.clear();
-
   // ---------------- Users tab ----------------
   List<dynamic> users = [];
   bool usersLoading = false;
@@ -138,11 +143,16 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     setState(() => creatingGiftCode = true);
     try {
       final res = await ApiService.instance.adminCreateGiftCode(
-        code: _giftCodeCtrl.text.trim().isEmpty ? null : _giftCodeCtrl.text.trim(),
+        code: _giftCodeCtrl.text.trim().isEmpty
+            ? null
+            : _giftCodeCtrl.text.trim(),
         diamondValue: _newGiftCodeValue,
       );
       _giftCodeCtrl.clear();
-      if (mounted) showToast(context, 'Gift code "${res['giftCode']['code']}" created', isSuccess: true);
+      if (mounted) {
+        showToast(context, 'Gift code "${res['giftCode']['code']}" created',
+            isSuccess: true);
+      }
       await _loadGiftCodes();
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -168,17 +178,24 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Force logout?'),
-        content: Text('$label will be signed out on all their devices. Their account and data are not affected.'),
+        content: Text(
+            '$label will be signed out on all their devices. Their account and data are not affected.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Logout')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Logout')),
         ],
       ),
     );
     if (confirm != true) return;
     try {
       final res = await ApiService.instance.forceLogoutUser(id);
-      if (mounted) showToast(context, res['message'] ?? 'Logged out', isSuccess: true);
+      if (mounted) {
+        showToast(context, res['message'] ?? 'Logged out', isSuccess: true);
+      }
     } catch (e) {
       if (mounted) showApiError(context, e);
     }
@@ -187,7 +204,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   Future<void> _toggleActive(String id, String label) async {
     try {
       final res = await ApiService.instance.toggleUserActive(id);
-      if (mounted) showToast(context, res['message'] ?? 'Updated', isSuccess: true);
+      if (mounted) {
+        showToast(context, res['message'] ?? 'Updated', isSuccess: true);
+      }
       _loadUsers(search: _searchCtrl.text.trim());
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -210,7 +229,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: Row(
             children: [
               const Icon(Icons.warning_rounded, color: AppColors.red, size: 22),
@@ -228,24 +248,34 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               const SizedBox(height: 6),
               Text(
                 'If they sign up again, they start over as a brand new user.',
-                style: TextStyle(color: Theme.of(dialogContext).hintColor, fontSize: 12.5),
+                style: TextStyle(
+                    color: Theme.of(dialogContext).hintColor, fontSize: 12.5),
               ),
               const SizedBox(height: 16),
-              Text('Type "$label" to confirm:', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+              Text('Type "$label" to confirm:',
+                  style: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               TextField(
                 controller: typedCtrl,
                 autofocus: true,
-                decoration: const InputDecoration(hintText: 'Type exact username/email here'),
-                onChanged: (v) => setDialogState(() => matches = v.trim() == label),
+                decoration: const InputDecoration(
+                    hintText: 'Type exact username/email here'),
+                onChanged: (v) =>
+                    setDialogState(() => matches = v.trim() == label),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel')),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: AppColors.red, foregroundColor: Colors.white),
-              onPressed: matches ? () => Navigator.pop(dialogContext, true) : null,
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.red,
+                  foregroundColor: Colors.white),
+              onPressed:
+                  matches ? () => Navigator.pop(dialogContext, true) : null,
               child: const Text('Delete Permanently'),
             ),
           ],
@@ -257,7 +287,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
     try {
       final res = await ApiService.instance.deleteUserAccount(id);
-      if (mounted) showToast(context, res['message'] ?? 'Account deleted', isSuccess: true);
+      if (mounted) {
+        showToast(context, res['message'] ?? 'Account deleted',
+            isSuccess: true);
+      }
       _loadUsers(search: _searchCtrl.text.trim());
     } catch (e) {
       if (mounted) showApiError(context, e);
@@ -266,9 +299,12 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   (Color, String) _statusBadge(String status) {
     switch (status) {
-      case 'approved': return (AppColors.green, 'approved');
-      case 'rejected': return (AppColors.red, 'rejected');
-      default: return (AppColors.diamond, status);
+      case 'approved':
+        return (AppColors.green, 'approved');
+      case 'rejected':
+        return (AppColors.red, 'rejected');
+      default:
+        return (AppColors.diamond, status);
     }
   }
 
@@ -283,13 +319,18 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withValues(alpha: 0.6)]),
+                gradient: LinearGradient(colors: [
+                  AppColors.purple,
+                  AppColors.purple.withValues(alpha: 0.6)
+                ]),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.shield_outlined, size: 18, color: Colors.white),
+              child: const Icon(Icons.shield_outlined,
+                  size: 18, color: Colors.white),
             ),
             const SizedBox(width: 10),
-            const Text('Admin Panel', style: TextStyle(fontWeight: FontWeight.w800)),
+            const Text('Admin Panel',
+                style: TextStyle(fontWeight: FontWeight.w800)),
           ],
         ),
         bottom: PreferredSize(
@@ -307,7 +348,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(colors: [AppColors.purple, AppColors.purple.withValues(alpha: 0.75)]),
+                gradient: LinearGradient(colors: [
+                  AppColors.purple,
+                  AppColors.purple.withValues(alpha: 0.75)
+                ]),
               ),
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
@@ -346,10 +390,30 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   Widget _statsGrid() {
     final cards = [
-      ('Total Users', '${stats?['totalUsers'] ?? 0}', Icons.groups_2_outlined, AppColors.purple),
-      ('Active Users', '${stats?['activeUsers'] ?? 0}', Icons.bolt_rounded, AppColors.green),
-      ('Revenue', '₹${stats?['revenue'] ?? 0}', Icons.currency_rupee_rounded, AppColors.diamond),
-      ('Upload Queue', '${stats?['uploadQueue'] ?? 0}', Icons.cloud_upload_outlined, AppColors.red),
+      (
+        'Total Users',
+        '${stats?['totalUsers'] ?? 0}',
+        Icons.groups_2_outlined,
+        AppColors.purple
+      ),
+      (
+        'Active Users',
+        '${stats?['activeUsers'] ?? 0}',
+        Icons.bolt_rounded,
+        AppColors.green
+      ),
+      (
+        'Revenue',
+        '₹${stats?['revenue'] ?? 0}',
+        Icons.currency_rupee_rounded,
+        AppColors.diamond
+      ),
+      (
+        'Upload Queue',
+        '${stats?['uploadQueue'] ?? 0}',
+        Icons.cloud_upload_outlined,
+        AppColors.red
+      ),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -379,21 +443,28 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             children: [
               Container(
                 padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10)),
                 child: Icon(icon, size: 16, color: color),
               ),
               const SizedBox(height: 10),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(value, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
+                child: Text(value,
+                    style: const TextStyle(
+                        fontSize: 21, fontWeight: FontWeight.w800)),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, color: context.surfaces.textDim, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    fontSize: 11.5,
+                    color: context.surfaces.textDim,
+                    fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -407,7 +478,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     final isLoading = paymentsLoadingByStatus[status] ?? false;
 
     if (!paymentsLoadedStatuses.contains(status) && !isLoading) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadPayments(status));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _loadPayments(status));
     }
 
     return RefreshIndicator(
@@ -422,14 +494,25 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             children: [
               Text(
                 '${status[0].toUpperCase()}${status.substring(1)} payments',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: context.surfaces.textDim, letterSpacing: 0.2),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.surfaces.textDim,
+                    letterSpacing: 0.2),
               ),
               const SizedBox(width: 8),
               if (!isLoading)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: context.surfaces.card2, borderRadius: BorderRadius.circular(20)),
-                  child: Text('${list.length}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: context.surfaces.textDim)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: context.surfaces.card2,
+                      borderRadius: BorderRadius.circular(20)),
+                  child: Text('${list.length}',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: context.surfaces.textDim)),
                 ),
             ],
           ),
@@ -450,12 +533,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           if (isLoading && list.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 50),
-              child: Center(child: CircularProgressIndicator(color: AppColors.purple)),
+              child: Center(
+                  child: CircularProgressIndicator(color: AppColors.purple)),
             )
           else if (list.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 20),
-              child: EmptyView(message: 'No $status payments', icon: Icons.payments_outlined),
+              child: EmptyView(
+                  message: 'No $status payments',
+                  icon: Icons.payments_outlined),
             )
           else
             ...list.map((t) => _paymentCard(t, status)),
@@ -469,9 +555,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     final cashfreeOrderId = t['cashfreeOrderId'];
     // Cashfree transactions show their Order ID; any older transaction
     // from before the Cashfree migration falls back to its UTR number.
-    final referenceLabel = (cashfreeOrderId != null && cashfreeOrderId.toString().isNotEmpty)
-        ? 'Order $cashfreeOrderId'
-        : 'UTR ${t['utrNumber'] ?? '-'}';
+    final referenceLabel =
+        (cashfreeOrderId != null && cashfreeOrderId.toString().isNotEmpty)
+            ? 'Order $cashfreeOrderId'
+            : 'UTR ${t['utrNumber'] ?? '-'}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -495,7 +582,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       backgroundColor: AppColors.purple.withValues(alpha: 0.15),
                       child: Text(
                         (t['userDisplayId'] ?? '?').toString().substring(0, 1),
-                        style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800, fontSize: 13),
+                        style: const TextStyle(
+                            color: AppColors.purple,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -503,8 +593,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(t['userDisplayId'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5), overflow: TextOverflow.ellipsis),
-                          Text(t['user']?['email'] ?? '', style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), overflow: TextOverflow.ellipsis),
+                          Text(t['userDisplayId'] ?? '',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13.5),
+                              overflow: TextOverflow.ellipsis),
+                          Text(t['user']?['email'] ?? '',
+                              style: TextStyle(
+                                  color: context.surfaces.textDim,
+                                  fontSize: 11.5),
+                              overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
@@ -514,11 +611,15 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('₹${t['amountINR']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text('₹${t['amountINR']}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800, fontSize: 15)),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('${t['diamondPackage']}', style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                      Text('${t['diamondPackage']}',
+                          style: TextStyle(
+                              color: context.surfaces.textDim, fontSize: 11.5)),
                       const SizedBox(width: 2),
                       const Text('💎', style: TextStyle(fontSize: 11)),
                     ],
@@ -530,17 +631,25 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(10)),
             child: Row(
               children: [
-                Icon(Icons.receipt_long_outlined, size: 13, color: context.surfaces.textDim),
+                Icon(Icons.receipt_long_outlined,
+                    size: 13, color: context.surfaces.textDim),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(referenceLabel, style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5), overflow: TextOverflow.ellipsis),
+                  child: Text(referenceLabel,
+                      style: TextStyle(
+                          color: context.surfaces.textDim, fontSize: 11.5),
+                      overflow: TextOverflow.ellipsis),
                 ),
                 Icon(Icons.schedule, size: 13, color: context.surfaces.textDim),
                 const SizedBox(width: 4),
-                Text(formatDateTime(t['createdAt']), style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                Text(formatDateTime(t['createdAt']),
+                    style: TextStyle(
+                        color: context.surfaces.textDim, fontSize: 11.5)),
               ],
             ),
           ),
@@ -549,18 +658,26 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             Align(
               alignment: Alignment.centerLeft,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.diamond.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                    color: AppColors.diamond.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20)),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     SizedBox(
                       width: 11,
                       height: 11,
-                      child: CircularProgressIndicator(strokeWidth: 1.6, color: AppColors.diamond),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.6, color: AppColors.diamond),
                     ),
                     const SizedBox(width: 6),
-                    Text('auto-checking', style: TextStyle(color: AppColors.diamond, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                    Text('auto-checking',
+                        style: TextStyle(
+                            color: AppColors.diamond,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700)),
                   ],
                 ),
               ),
@@ -571,14 +688,26 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(color: badgeColor.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(status == 'approved' ? Icons.check_circle : Icons.cancel, size: 12, color: badgeColor),
+                      Icon(
+                          status == 'approved'
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          size: 12,
+                          color: badgeColor),
                       const SizedBox(width: 4),
-                      Text(badgeLabel, style: TextStyle(color: badgeColor, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      Text(badgeLabel,
+                          style: TextStyle(
+                              color: badgeColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -607,12 +736,20 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
               controller: _searchCtrl,
               decoration: InputDecoration(
                 hintText: 'Search by username, email, or user ID',
-                hintStyle: TextStyle(fontSize: 13, color: context.surfaces.textDim),
+                hintStyle:
+                    TextStyle(fontSize: 13, color: context.surfaces.textDim),
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                prefixIcon: Icon(Icons.search, size: 20, color: context.surfaces.textDim),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                prefixIcon: Icon(Icons.search,
+                    size: 20, color: context.surfaces.textDim),
                 suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () { _searchCtrl.clear(); _loadUsers(); })
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          _loadUsers();
+                        })
                     : null,
               ),
               onSubmitted: (v) => _loadUsers(search: v.trim()),
@@ -623,56 +760,101 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             child: usersLoading
                 ? const LoadingView()
                 : users.isEmpty
-                    ? const EmptyView(message: 'No users found', icon: Icons.people_outline)
+                    ? const EmptyView(
+                        message: 'No users found', icon: Icons.people_outline)
                     : RefreshIndicator(
                         color: AppColors.purple,
-                        onRefresh: () => _loadUsers(search: _searchCtrl.text.trim()),
+                        onRefresh: () =>
+                            _loadUsers(search: _searchCtrl.text.trim()),
                         child: ListView.builder(
                           itemCount: users.length,
                           itemBuilder: (_, i) {
                             final u = users[i];
                             final isActive = u['isActive'] ?? true;
-                            final displayName = (u['username'] ?? u['email'] ?? 'U').toString();
-                            final deleteLabel = (u['username'] ?? u['email'] ?? 'User').toString();
+                            final displayName =
+                                (u['username'] ?? u['email'] ?? 'U').toString();
+                            final deleteLabel =
+                                (u['username'] ?? u['email'] ?? 'User')
+                                    .toString();
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: context.surfaces.card2,
-                                border: Border.all(color: context.surfaces.border),
+                                border:
+                                    Border.all(color: context.surfaces.border),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Row(
                                           children: [
                                             CircleAvatar(
                                               radius: 20,
-                                              backgroundColor: (isActive ? AppColors.green : AppColors.red).withValues(alpha: 0.15),
+                                              backgroundColor: (isActive
+                                                      ? AppColors.green
+                                                      : AppColors.red)
+                                                  .withValues(alpha: 0.15),
                                               child: Text(
-                                                displayName.substring(0, 1).toUpperCase(),
-                                                style: TextStyle(color: isActive ? AppColors.green : AppColors.red, fontWeight: FontWeight.w800),
+                                                displayName
+                                                    .substring(0, 1)
+                                                    .toUpperCase(),
+                                                style: TextStyle(
+                                                    color: isActive
+                                                        ? AppColors.green
+                                                        : AppColors.red,
+                                                    fontWeight:
+                                                        FontWeight.w800),
                                               ),
                                             ),
                                             const SizedBox(width: 12),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Text('@${u['username'] ?? u['userId'] ?? '-'}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), overflow: TextOverflow.ellipsis),
+                                                  Text(
+                                                      '@${u['username'] ?? u['userId'] ?? '-'}',
+                                                      style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 14),
+                                                      overflow: TextOverflow
+                                                          .ellipsis),
                                                   const SizedBox(height: 2),
-                                                  Text(u['email'] ?? '-', style: TextStyle(color: context.surfaces.textDim, fontSize: 12), overflow: TextOverflow.ellipsis),
+                                                  Text(u['email'] ?? '-',
+                                                      style: TextStyle(
+                                                          color: context
+                                                              .surfaces.textDim,
+                                                          fontSize: 12),
+                                                      overflow: TextOverflow
+                                                          .ellipsis),
                                                   const SizedBox(height: 4),
                                                   Row(
                                                     children: [
-                                                      Text('${u['userId'] ?? ''}', style: TextStyle(color: context.surfaces.textDim, fontSize: 11)),
+                                                      Text(
+                                                          '${u['userId'] ?? ''}',
+                                                          style: TextStyle(
+                                                              color: context
+                                                                  .surfaces
+                                                                  .textDim,
+                                                              fontSize: 11)),
                                                       const SizedBox(width: 6),
-                                                      Text('💎 ${u['diamondBalance'] ?? 0}', style: const TextStyle(color: AppColors.diamond, fontSize: 11, fontWeight: FontWeight.w700)),
+                                                      Text(
+                                                          '💎 ${u['diamondBalance'] ?? 0}',
+                                                          style: const TextStyle(
+                                                              color: AppColors
+                                                                  .diamond,
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w700)),
                                                     ],
                                                   ),
                                                 ],
@@ -682,14 +864,24 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                         ),
                                       ),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: (isActive ? AppColors.green : AppColors.red).withValues(alpha: 0.14),
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: (isActive
+                                                  ? AppColors.green
+                                                  : AppColors.red)
+                                              .withValues(alpha: 0.14),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
                                         ),
                                         child: Text(
                                           isActive ? 'Active' : 'Suspended',
-                                          style: TextStyle(color: isActive ? AppColors.green : AppColors.red, fontSize: 10.5, fontWeight: FontWeight.w700),
+                                          style: TextStyle(
+                                              color: isActive
+                                                  ? AppColors.green
+                                                  : AppColors.red,
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700),
                                         ),
                                       ),
                                     ],
@@ -698,26 +890,54 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                   Row(children: [
                                     Expanded(
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _forceLogout(u['_id'], u['username'] ?? u['email'] ?? 'User'),
-                                        icon: const Icon(Icons.logout, size: 14),
-                                        label: const Text('Force Logout', style: TextStyle(fontSize: 12)),
+                                        onPressed: () => _forceLogout(
+                                            u['_id'],
+                                            u['username'] ??
+                                                u['email'] ??
+                                                'User'),
+                                        icon:
+                                            const Icon(Icons.logout, size: 14),
+                                        label: const Text('Force Logout',
+                                            style: TextStyle(fontSize: 12)),
                                         style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: OutlinedButton.icon(
-                                        onPressed: () => _toggleActive(u['_id'], u['username'] ?? u['email'] ?? 'User'),
-                                        icon: Icon(isActive ? Icons.block : Icons.check_circle_outline, size: 14),
-                                        label: Text(isActive ? 'Suspend' : 'Reactivate', style: const TextStyle(fontSize: 12)),
+                                        onPressed: () => _toggleActive(
+                                            u['_id'],
+                                            u['username'] ??
+                                                u['email'] ??
+                                                'User'),
+                                        icon: Icon(
+                                            isActive
+                                                ? Icons.block
+                                                : Icons.check_circle_outline,
+                                            size: 14),
+                                        label: Text(
+                                            isActive ? 'Suspend' : 'Reactivate',
+                                            style:
+                                                const TextStyle(fontSize: 12)),
                                         style: OutlinedButton.styleFrom(
-                                          foregroundColor: isActive ? AppColors.red : AppColors.green,
-                                          side: BorderSide(color: isActive ? AppColors.red : AppColors.green),
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          foregroundColor: isActive
+                                              ? AppColors.red
+                                              : AppColors.green,
+                                          side: BorderSide(
+                                              color: isActive
+                                                  ? AppColors.red
+                                                  : AppColors.green),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 10),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10)),
                                         ),
                                       ),
                                     ),
@@ -726,14 +946,21 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                                   SizedBox(
                                     width: double.infinity,
                                     child: OutlinedButton.icon(
-                                      onPressed: () => _deleteAccount(u['_id'], deleteLabel),
-                                      icon: const Icon(Icons.delete_forever, size: 14),
-                                      label: const Text('Delete Account', style: TextStyle(fontSize: 12)),
+                                      onPressed: () =>
+                                          _deleteAccount(u['_id'], deleteLabel),
+                                      icon: const Icon(Icons.delete_forever,
+                                          size: 14),
+                                      label: const Text('Delete Account',
+                                          style: TextStyle(fontSize: 12)),
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: AppColors.red,
-                                        side: const BorderSide(color: AppColors.red),
-                                        padding: const EdgeInsets.symmetric(vertical: 10),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        side: const BorderSide(
+                                            color: AppColors.red),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
                                       ),
                                     ),
                                   ),
@@ -770,23 +997,33 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Generate Gift Code', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                const Text('Generate Gift Code',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                 const SizedBox(height: 10),
                 TextField(
                   controller: _giftCodeCtrl,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(hintText: 'Custom code (optional — leave blank to auto-generate)'),
+                  decoration: const InputDecoration(
+                      hintText:
+                          'Custom code (optional — leave blank to auto-generate)'),
                 ),
                 const SizedBox(height: 12),
                 Row(children: [
-                  Text('Diamond value:', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  Text('Diamond value:',
+                      style: TextStyle(
+                          color: context.surfaces.textDim,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(width: 10),
                   ChoiceChip(
                     label: const Text('2 💎'),
                     selected: _newGiftCodeValue == 2,
                     onSelected: (_) => setState(() => _newGiftCodeValue = 2),
                     selectedColor: AppColors.purple,
-                    labelStyle: TextStyle(color: _newGiftCodeValue == 2 ? Colors.white : null, fontWeight: FontWeight.w700),
+                    labelStyle: TextStyle(
+                        color: _newGiftCodeValue == 2 ? Colors.white : null,
+                        fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
@@ -794,7 +1031,9 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     selected: _newGiftCodeValue == 3,
                     onSelected: (_) => setState(() => _newGiftCodeValue = 3),
                     selectedColor: AppColors.purple,
-                    labelStyle: TextStyle(color: _newGiftCodeValue == 3 ? Colors.white : null, fontWeight: FontWeight.w700),
+                    labelStyle: TextStyle(
+                        color: _newGiftCodeValue == 3 ? Colors.white : null,
+                        fontWeight: FontWeight.w700),
                   ),
                 ]),
                 const SizedBox(height: 14),
@@ -803,7 +1042,11 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                   child: ElevatedButton.icon(
                     onPressed: creatingGiftCode ? null : _createGiftCode,
                     icon: creatingGiftCode
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
                         : const Icon(Icons.add_rounded, size: 18),
                     label: const Text('Create Code'),
                   ),
@@ -812,13 +1055,19 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
             ),
           ),
           const SizedBox(height: 16),
-          Text('All Gift Codes', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, fontWeight: FontWeight.w700)),
+          Text('All Gift Codes',
+              style: TextStyle(
+                  color: context.surfaces.textDim,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
           Expanded(
             child: giftCodesLoading
                 ? const LoadingView()
                 : giftCodes.isEmpty
-                    ? const EmptyView(message: 'No gift codes yet', icon: Icons.card_giftcard_outlined)
+                    ? const EmptyView(
+                        message: 'No gift codes yet',
+                        icon: Icons.card_giftcard_outlined)
                     : RefreshIndicator(
                         color: AppColors.purple,
                         onRefresh: _loadGiftCodes,
@@ -827,35 +1076,49 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                           itemBuilder: (_, i) {
                             final g = giftCodes[i];
                             final active = g['active'] == true;
-                            final redemptions = (g['redeemedBy'] as List?)?.length ?? 0;
+                            final redemptions =
+                                (g['redeemedBy'] as List?)?.length ?? 0;
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: context.surfaces.card2,
-                                border: Border.all(color: context.surfaces.border),
+                                border:
+                                    Border.all(color: context.surfaces.border),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(children: [
-                                          Text(g['code'] ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: 1)),
+                                          Text(g['code'] ?? '',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 15,
+                                                  letterSpacing: 1)),
                                           const SizedBox(width: 8),
-                                          AppBadge(label: '${g['diamondValue']} 💎', color: AppColors.diamond),
+                                          AppBadge(
+                                              label: '${g['diamondValue']} 💎',
+                                              color: AppColors.diamond),
                                         ]),
                                         const SizedBox(height: 4),
-                                        Text('$redemptions redemption${redemptions == 1 ? '' : 's'}', style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
+                                        Text(
+                                            '$redemptions redemption${redemptions == 1 ? '' : 's'}',
+                                            style: TextStyle(
+                                                color: context.surfaces.textDim,
+                                                fontSize: 11.5)),
                                       ],
                                     ),
                                   ),
                                   Switch(
                                     value: active,
                                     activeTrackColor: AppColors.purple,
-                                    onChanged: (_) => _toggleGiftCodeActive(g['_id']),
+                                    onChanged: (_) =>
+                                        _toggleGiftCodeActive(g['_id']),
                                   ),
                                 ],
                               ),

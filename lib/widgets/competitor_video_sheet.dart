@@ -11,7 +11,8 @@ import 'competitor_widgets.dart';
 /// Bottom sheet opened when a competitor video is tapped: thumbnail, title,
 /// description and tags can be copied, the thumbnail can be downloaded.
 /// Description/tags come from GET /analytics/competitors/video/:videoId.
-Future<void> showCompetitorVideoSheet(BuildContext context, Map<String, dynamic> video) {
+Future<void> showCompetitorVideoSheet(
+    BuildContext context, Map<String, dynamic> video) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -23,7 +24,8 @@ Future<void> showCompetitorVideoSheet(BuildContext context, Map<String, dynamic>
         ? const Color(0xFF1B1422)
         : const Color(0xFFFFF8E7),
     clipBehavior: Clip.antiAlias,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
     builder: (_) => _VideoSheet(video: video),
   );
 }
@@ -54,7 +56,9 @@ class _VideoSheetState extends State<_VideoSheet> {
   Future<void> _loadDetails() async {
     try {
       final res = await ApiService.instance.getCompetitorVideoDetails(_videoId);
-      final v = res['video'] is Map ? Map<String, dynamic>.from(res['video']) : <String, dynamic>{};
+      final v = res['video'] is Map
+          ? Map<String, dynamic>.from(res['video'])
+          : <String, dynamic>{};
       if (!mounted) return;
       setState(() {
         _description = v['description']?.toString();
@@ -69,7 +73,7 @@ class _VideoSheetState extends State<_VideoSheet> {
     }
   }
 
-  Future<void> _copy(String text, {String? labelKey}) async {
+  Future<void> _copy(String text) async {
     if (text.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) showToast(context, context.tr('rd_copied'), isSuccess: true);
@@ -94,7 +98,10 @@ class _VideoSheetState extends State<_VideoSheet> {
         await resp.drain();
       }
       if (bytes == null) return null;
-      for (final dir in ['/storage/emulated/0/Pictures/TubePilot', '/storage/emulated/0/Download/TubePilot']) {
+      for (final dir in [
+        '/storage/emulated/0/Pictures/TubePilot',
+        '/storage/emulated/0/Download/TubePilot'
+      ]) {
         try {
           final d = Directory(dir);
           await d.create(recursive: true);
@@ -118,11 +125,13 @@ class _VideoSheetState extends State<_VideoSheet> {
     if (!mounted) return;
     setState(() => _downloading = false);
     if (path != null) {
-      showToast(context, context.tr('rd_download_ok').replaceAll('%1', path), isSuccess: true);
+      showToast(context, context.tr('rd_download_ok').replaceAll('%1', path),
+          isSuccess: true);
     } else {
       // Could not write to storage - open the image so it can be saved from the browser.
       showToast(context, context.tr('rd_download_fail'), isSuccess: false);
-      await openYoutubeVideo('https://i.ytimg.com/vi/$_videoId/maxresdefault.jpg');
+      await openYoutubeVideo(
+          'https://i.ytimg.com/vi/$_videoId/maxresdefault.jpg');
     }
   }
 
@@ -149,7 +158,9 @@ class _VideoSheetState extends State<_VideoSheet> {
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: context.surfaces.border, borderRadius: BorderRadius.circular(4)),
+              decoration: BoxDecoration(
+                  color: context.surfaces.border,
+                  borderRadius: BorderRadius.circular(4)),
             ),
           ),
           ClipRRect(
@@ -160,18 +171,28 @@ class _VideoSheetState extends State<_VideoSheet> {
                 'https://i.ytimg.com/vi/$_videoId/maxresdefault.jpg',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => thumb.isNotEmpty
-                    ? Image.network(thumb, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: context.surfaces.card2))
+                    ? Image.network(thumb,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Container(color: context.surfaces.card2))
                     : Container(color: context.surfaces.card2),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          if (channel.isNotEmpty) competitorChannelChip(context, key: key, label: channel, thumbnail: channelThumb),
+          if (channel.isNotEmpty)
+            competitorChannelChip(context,
+                key: key, label: channel, thumbnail: channelThumb),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: SelectableText(_title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, height: 1.3))),
+              Expanded(
+                  child: SelectableText(_title,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.3))),
               IconButton(
                 tooltip: context.tr('rd_copy_title'),
                 onPressed: () => _copy(_title),
@@ -190,33 +211,53 @@ class _VideoSheetState extends State<_VideoSheet> {
                 child: OutlinedButton.icon(
                   onPressed: _downloading ? null : _download,
                   icon: _downloading
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.download_rounded, size: 18),
-                  label: Text(context.tr('rd_download_thumb'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  label: Text(context.tr('rd_download_thumb'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => openYoutubeVideo(v['url']?.toString() ?? 'https://www.youtube.com/watch?v=$_videoId'),
+                  onPressed: () => openYoutubeVideo(v['url']?.toString() ??
+                      'https://www.youtube.com/watch?v=$_videoId'),
                   icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                  label: Text(context.tr('rd_open_youtube'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  label: Text(context.tr('rd_open_youtube'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 12.5)),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          _sectionRow(context.tr('rd_description'), (_description ?? '').isEmpty ? null : () => _copy(_description!)),
+          _sectionRow(context.tr('rd_description'),
+              (_description ?? '').isEmpty ? null : () => _copy(_description!)),
           const SizedBox(height: 6),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(border: Border.all(color: context.surfaces.border), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+                border: Border.all(color: context.surfaces.border),
+                borderRadius: BorderRadius.circular(12)),
             child: _loadingDetails
-                ? const Center(child: Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))))
+                ? const Center(
+                    child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))))
                 : (_description == null || _description!.trim().isEmpty)
-                    ? Text(context.tr('rd_desc_unavailable'), style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5))
-                    : SelectableText(_description!, style: const TextStyle(fontSize: 13, height: 1.4)),
+                    ? Text(context.tr('rd_desc_unavailable'),
+                        style: TextStyle(
+                            color: context.surfaces.textDim, fontSize: 12.5))
+                    : SelectableText(_description!,
+                        style: const TextStyle(fontSize: 13, height: 1.4)),
           ),
           if (_tags.isNotEmpty) ...[
             const SizedBox(height: 18),
@@ -227,9 +268,14 @@ class _VideoSheetState extends State<_VideoSheet> {
               runSpacing: 6,
               children: _tags
                   .map((t) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(color: AppColors.purple.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-                        child: Text(t, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                            color: AppColors.purple.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Text(t,
+                            style: const TextStyle(
+                                fontSize: 11.5, fontWeight: FontWeight.w600)),
                       ))
                   .toList(),
             ),
@@ -242,12 +288,17 @@ class _VideoSheetState extends State<_VideoSheet> {
   Widget _sectionRow(String title, VoidCallback? onCopy) {
     return Row(
       children: [
-        Expanded(child: Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800))),
+        Expanded(
+            child: Text(title,
+                style: const TextStyle(
+                    fontSize: 14.5, fontWeight: FontWeight.w800))),
         if (onCopy != null)
           TextButton.icon(
             onPressed: onCopy,
             icon: const Icon(Icons.copy_rounded, size: 16),
-            label: Text(context.tr('rd_copy'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+            label: Text(context.tr('rd_copy'),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12.5)),
           ),
       ],
     );

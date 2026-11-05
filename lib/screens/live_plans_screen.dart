@@ -3,7 +3,6 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/payu_checkout.dart';
-import '../providers/language_provider.dart';
 
 /// Day Pass aur Month Pass dono ek hi screen mein, tab switcher ke saath.
 /// Diamond Store screen (diamond_store_screen.dart) jaisa hi structure aur
@@ -15,7 +14,8 @@ class LivePlansScreen extends StatefulWidget {
   State<LivePlansScreen> createState() => _LivePlansScreenState();
 }
 
-class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProviderStateMixin {
+class _LivePlansScreenState extends State<LivePlansScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   List<dynamic> dayPasses = [];
@@ -83,9 +83,10 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     return PopScope(
       canPop: _payingPlanName == null,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _payingPlanName != null) {
-          showToast(context, 'Please wait — confirming your payment...', isError: false);
+          showToast(context, 'Please wait — confirming your payment...',
+              isError: false);
         }
       },
       child: Scaffold(
@@ -114,16 +115,19 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
 
   Widget _buildPlanList(String category, List<dynamic> plans) {
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, 20 + MediaQuery.of(context).padding.bottom + 24),
       children: [
         if (!freeTrialUsed) _freeTrialBanner(),
-        if (currentPlan != null && currentPlan!['planCategory'] != 'none') _currentPlanBanner(),
+        if (currentPlan != null && currentPlan!['planCategory'] != 'none')
+          _currentPlanBanner(),
         const SizedBox(height: 10),
         ...List.generate(
           plans.length,
           (index) => Padding(
             padding: const EdgeInsets.only(bottom: 14),
-            child: _planCard(category, plans[index], isPopular: index == (plans.length / 2).floor()),
+            child: _planCard(category, plans[index],
+                isPopular: index == (plans.length / 2).floor()),
           ),
         ),
       ],
@@ -141,7 +145,8 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
       ),
       child: Row(
         children: [
-          const Icon(Icons.card_giftcard_rounded, color: AppColors.green, size: 20),
+          const Icon(Icons.card_giftcard_rounded,
+              color: AppColors.green, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -158,12 +163,15 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
     final planName = currentPlan!['planName'] ?? '';
     final allottedSec = (currentPlan!['hoursAllottedSeconds'] ?? 0) as int;
     final usedSec = (currentPlan!['hoursUsedSeconds'] ?? 0) as int;
-    final remainingHours = ((allottedSec - usedSec) / 3600).clamp(0, double.infinity);
+    final remainingHours =
+        ((allottedSec - usedSec) / 3600).clamp(0, double.infinity);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+          gradient: AppColors.gradient,
+          borderRadius: BorderRadius.circular(16)),
       child: Row(
         children: [
           const Icon(Icons.podcasts_rounded, color: Colors.white, size: 22),
@@ -172,9 +180,15 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Active Plan: $planName', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+                Text('Active Plan: $planName',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14)),
                 const SizedBox(height: 2),
-                Text('${remainingHours.toStringAsFixed(1)} hours remaining', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                Text('${remainingHours.toStringAsFixed(1)} hours remaining',
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
@@ -209,9 +223,17 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
               right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.purple, borderRadius: BorderRadius.circular(999)),
-                  child: const Text('POPULAR', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppColors.purple,
+                      borderRadius: BorderRadius.circular(999)),
+                  child: const Text('POPULAR',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3)),
                 ),
               ),
             ),
@@ -227,17 +249,25 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
                     width: 44,
                     height: 44,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(gradient: AppColors.gradient, borderRadius: BorderRadius.circular(14)),
-                    child: const Icon(Icons.podcasts_rounded, color: Colors.white, size: 24),
+                    decoration: BoxDecoration(
+                        gradient: AppColors.gradient,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: const Icon(Icons.podcasts_rounded,
+                        color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15.5)),
+                        Text(name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 15.5)),
                         const SizedBox(height: 2),
-                        Text('₹$price', style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5)),
+                        Text('₹$price',
+                            style: TextStyle(
+                                color: context.surfaces.textDim,
+                                fontSize: 12.5)),
                       ],
                     ),
                   ),
@@ -248,29 +278,41 @@ class _LivePlansScreenState extends State<LivePlansScreen> with SingleTickerProv
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.access_time_rounded, size: 15, color: AppColors.green),
+                  Icon(Icons.access_time_rounded,
+                      size: 15, color: AppColors.green),
                   const SizedBox(width: 8),
                   Text(
-                    category == 'day' ? '$hours hours (usi din tak)' : '$hours hours / month',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                    category == 'day'
+                        ? '$hours hours (usi din tak)'
+                        : '$hours hours / month',
+                    style: const TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Icon(Icons.video_settings_rounded, size: 15, color: AppColors.green),
+                  Icon(Icons.video_settings_rounded,
+                      size: 15, color: AppColors.green),
                   const SizedBox(width: 8),
-                  const Text('Max 2GB video size', style: TextStyle(fontSize: 12.5)),
+                  const Text('Max 2GB video size',
+                      style: TextStyle(fontSize: 12.5)),
                 ],
               ),
               const SizedBox(height: 14),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _payingPlanName != null ? null : () => _buy(category, name),
+                  onPressed: _payingPlanName != null
+                      ? null
+                      : () => _buy(category, name),
                   child: isPaying
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Text('Buy Now'),
                 ),
               ),

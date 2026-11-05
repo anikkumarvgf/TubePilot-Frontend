@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/services.dart';
@@ -57,17 +58,20 @@ Future<void> _initBackgroundServices() async {
   try {
     await Firebase.initializeApp().timeout(
       const Duration(seconds: 8),
-      onTimeout: () => throw Exception('Firebase.initializeApp() timed out after 8s'),
+      onTimeout: () =>
+          throw Exception('Firebase.initializeApp() timed out after 8s'),
     );
   } catch (e) {
-    debugPrint('⚠️ Firebase init failed/skipped, continuing without push notifications: $e');
+    debugPrint(
+        '⚠️ Firebase init failed/skipped, continuing without push notifications: $e');
   }
 
   try {
     OneSignal.initialize(oneSignalAppId);
     OneSignal.Notifications.requestPermission(true);
   } catch (e) {
-    debugPrint('⚠️ OneSignal init failed/skipped, continuing without diamond-alert push: $e');
+    debugPrint(
+        '⚠️ OneSignal init failed/skipped, continuing without diamond-alert push: $e');
   }
 }
 
@@ -106,8 +110,10 @@ class _FestivalPageTransitionsBuilder extends PageTransitionsBuilder {
 
 const PageTransitionsTheme _festivalTransitions = PageTransitionsTheme(
   builders: {
-    TargetPlatform.android: _FestivalPageTransitionsBuilder(ZoomPageTransitionsBuilder()),
-    TargetPlatform.iOS: _FestivalPageTransitionsBuilder(CupertinoPageTransitionsBuilder()),
+    TargetPlatform.android:
+        _FestivalPageTransitionsBuilder(ZoomPageTransitionsBuilder()),
+    TargetPlatform.iOS:
+        _FestivalPageTransitionsBuilder(CupertinoPageTransitionsBuilder()),
   },
 );
 
@@ -151,12 +157,24 @@ class _TubePilotAppState extends State<TubePilotApp> {
     try {
       final existingId = OneSignal.User.pushSubscription.id;
       if (existingId != null) {
-        ApiService.instance.registerOneSignalPlayerId(existingId).catchError((_) {});
+        ApiService.instance
+            .registerOneSignalPlayerId(existingId)
+            .catchError((error) {
+          if (kDebugMode) debugPrint('OneSignal player ID sync failed: $error');
+          return <String, dynamic>{};
+        });
       }
       OneSignal.User.pushSubscription.addObserver((state) {
         final playerId = OneSignal.User.pushSubscription.id;
         if (playerId != null) {
-          ApiService.instance.registerOneSignalPlayerId(playerId).catchError((_) {});
+          ApiService.instance
+              .registerOneSignalPlayerId(playerId)
+              .catchError((error) {
+            if (kDebugMode) {
+              debugPrint('OneSignal player ID sync failed: $error');
+            }
+            return <String, dynamic>{};
+          });
         }
       });
     } catch (e) {
@@ -201,7 +219,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (_lastHandledUri == uri) return;
     _lastHandledUri = uri;
 
-    final hasYoutubeParam = uri.queryParameters.containsKey('youtube_connected');
+    final hasYoutubeParam =
+        uri.queryParameters.containsKey('youtube_connected');
     final hasDriveParam = uri.queryParameters.containsKey('drive_connected');
     final hasMetaParam = uri.queryParameters.containsKey('meta_connected');
     final ctx = navigatorKey.currentContext;
@@ -212,18 +231,36 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (hasYoutubeParam) {
       final connected = uri.queryParameters['youtube_connected'] == '1';
       if (ctx != null) {
-        showToast(ctx, connected ? 'YouTube channel connected!' : 'Failed to connect YouTube channel', isSuccess: connected, isError: !connected);
+        showToast(
+            ctx,
+            connected
+                ? 'YouTube channel connected!'
+                : 'Failed to connect YouTube channel',
+            isSuccess: connected,
+            isError: !connected);
       }
     } else if (hasDriveParam) {
       final connected = uri.queryParameters['drive_connected'] == '1';
       if (ctx != null) {
-        showToast(ctx, connected ? 'Google Drive connected!' : 'Failed to connect Google Drive', isSuccess: connected, isError: !connected);
+        showToast(
+            ctx,
+            connected
+                ? 'Google Drive connected!'
+                : 'Failed to connect Google Drive',
+            isSuccess: connected,
+            isError: !connected);
       }
     } else if (hasMetaParam) {
       metaSuccess = uri.queryParameters['meta_connected'] == '1';
       metaMultiplePages = uri.queryParameters['multiple_pages'] == '1';
       if (ctx != null && !metaMultiplePages) {
-        showToast(ctx, metaSuccess ? 'Facebook / Instagram connected!' : 'Failed to connect Facebook / Instagram', isSuccess: metaSuccess, isError: !metaSuccess);
+        showToast(
+            ctx,
+            metaSuccess
+                ? 'Facebook / Instagram connected!'
+                : 'Failed to connect Facebook / Instagram',
+            isSuccess: metaSuccess,
+            isError: !metaSuccess);
       }
     }
 
@@ -233,7 +270,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
     );
 
     if (hasMetaParam && metaSuccess && metaMultiplePages) {
-      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const MetaPagePickerScreen()));
+      navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const MetaPagePickerScreen()));
     }
   }
 
@@ -247,7 +285,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (videoId == null || videoId.isEmpty) return;
 
     navigatorKey.currentState?.push(
-      MaterialPageRoute(builder: (_) => MyVideosScreen(highlightVideoId: videoId)),
+      MaterialPageRoute(
+          builder: (_) => MyVideosScreen(highlightVideoId: videoId)),
     );
   }
 
@@ -265,7 +304,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
-        ChangeNotifierProvider<LanguageProvider>.value(value: widget.languageProvider),
+        ChangeNotifierProvider<LanguageProvider>.value(
+            value: widget.languageProvider),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -275,8 +315,10 @@ class _TubePilotAppState extends State<TubePilotApp> {
               navigatorKey: navigatorKey,
               title: 'TubePilot',
               debugShowCheckedModeBanner: false,
-              theme: AppTheme.light.copyWith(pageTransitionsTheme: _festivalTransitions),
-              darkTheme: AppTheme.dark.copyWith(pageTransitionsTheme: _festivalTransitions),
+              theme: AppTheme.light
+                  .copyWith(pageTransitionsTheme: _festivalTransitions),
+              darkTheme: AppTheme.dark
+                  .copyWith(pageTransitionsTheme: _festivalTransitions),
               themeMode: themeProvider.themeMode,
               // ⚠️ NEW — SYSTEM NAV BAR (buttons + gestures) ka ek hi hal, sab screens ke liye.
               // Android ka neeche wala system area (3-button bar ~48dp, gesture mode mein
@@ -289,7 +331,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
               // Hidden while the keyboard is open, and on Splash/Login (Dashboard not alive).
               builder: (context, child) {
                 final bottom = MediaQuery.paddingOf(context).bottom;
-                final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+                final keyboardOpen =
+                    MediaQuery.viewInsetsOf(context).bottom > 0;
                 return ColoredBox(
                   color: AppColors.festivalIvory,
                   child: Padding(
@@ -300,7 +343,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
                       child: AnimatedBuilder(
                         animation: AppNav.instance,
                         builder: (context, _) {
-                          final showNav = AppNav.instance.visible && !keyboardOpen;
+                          final showNav =
+                              AppNav.instance.visible && !keyboardOpen;
                           return Column(
                             children: [
                               Expanded(child: child ?? const SizedBox.shrink()),
@@ -312,7 +356,8 @@ class _TubePilotAppState extends State<TubePilotApp> {
                                     // Back to the Dashboard (closes any pushed screens / dialogs).
                                     final r = AppNav.instance.dashboardRoute;
                                     if (r != null && r.isActive) {
-                                      navigatorKey.currentState?.popUntil((x) => x == r);
+                                      navigatorKey.currentState
+                                          ?.popUntil((x) => x == r);
                                     }
                                   },
                                 ),
