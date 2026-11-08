@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../services/api_service.dart';
+import '../services/payment_gate.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
@@ -82,9 +83,16 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
     return Uri.tryParse(url)?.queryParameters['v'];
   }
 
+  // Not paid yet -> the setup view is replaced by a "locked" message (see build).
+  void _onGate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    PaymentGate.instance.addListener(_onGate);
+    PaymentGate.instance.refresh();
     _ticker = Timer.periodic(const Duration(seconds: 1), _onTick);
     _loadAppOrigin();
     _refreshLimits();
@@ -92,6 +100,7 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
 
   @override
   void dispose() {
+    PaymentGate.instance.removeListener(_onGate);
     _ticker?.cancel();
     _ytController?.close();
     _titleController.dispose();
@@ -369,7 +378,14 @@ class _LiveStreamScreenState extends State<LiveStreamScreen> {
           ],
         ),
         body: SafeArea(
-          child: _stage == _LiveStage.live ? _buildLiveView() : _buildSetupView(),
+          child: _stage == _LiveStage.live
+              ? _buildLiveView()
+              : PaymentGate.instance.locked
+                  ? const LockedFeatureView(
+                      title: 'Live Stream is locked',
+                      message: 'Pay once to unlock live streaming, uploads and channel connect.',
+                    )
+                  : _buildSetupView(),
         ),
       ),
     );
@@ -818,6 +834,9 @@ class _LiveOldVideosScreenState extends State<LiveOldVideosScreen> {
   }
 
   Future<void> _openStartSheet(Map<String, dynamic> item) async {
+    // Not paid yet -> Rs1 popup, the live does not start.
+    if (!await PaymentGate.instance.ensureUnlocked(context)) return;
+    if (!mounted) return;
     if (_blocked) {
       showToast(context, context.tr('live_toast_cannot_start'), isError: true);
       return;

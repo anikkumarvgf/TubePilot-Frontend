@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart' as custom_tabs;
 import '../services/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/payment_gate.dart';
 import '../providers/language_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common.dart';
@@ -213,11 +214,18 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
   }
 
   Future<void> _connectYoutube() async {
+    // Not paid yet (Rs1 plan / diamond pack): the channel page must not open. Shows the Rs1 popup instead.
+    if (!await PaymentGate.instance.ensureUnlocked(context)) return;
     try {
       final res = await ApiService.instance.getYoutubeOAuthUrl();
       if (res['url'] != null) await _launchOAuth(res['url']);
     } catch (e) {
-      if (mounted) showApiError(context, e);
+      if (!mounted) return;
+      if (e is ApiException && e.code == 'PAYMENT_REQUIRED') {
+        await PaymentGate.instance.ensureUnlocked(context); // backend says "not paid" -> same popup
+      } else {
+        showApiError(context, e);
+      }
     }
   }
 

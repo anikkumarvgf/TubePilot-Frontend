@@ -7,14 +7,13 @@ import '../services/api_service.dart';
 import '../services/push_service.dart';
 import '../widgets/common.dart';
 import '../widgets/app_decor.dart';
-import '../widgets/app_brand_background.dart';
 import '../widgets/app_popups.dart';
 import '../providers/language_provider.dart';
 import 'username_setup_screen.dart';
 import 'dashboard_screen.dart';
 
-/// Login + Sign Up (one screen, two modes) - layout follows the UI design:
-/// off-white page with the faint play-icon pattern, big plum "Hello!", lavender rounded sheet with pill fields.
+/// Login + Sign Up (one screen, two modes) - layout follows the UPDATED UI design:
+/// light page with faint play-icon pattern + big plum "Hello!", light rounded sheet with pill fields.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -42,7 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _slowHintTimer?.cancel();
     _slowHintTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) {
-        setState(() => slowServerHint = context.tr('waking_up_server_hint'));
+        // If the key is missing from the language files, tr() returns the key itself -> show a real sentence.
+        final t = context.tr('waking_up_server_hint');
+        setState(() => slowServerHint =
+            (t.isEmpty || t == 'waking_up_server_hint') ? 'Waking up the server, please wait a few seconds...' : t);
       }
     });
   }
@@ -115,11 +117,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     try {
       await auth.googleLogin();
-      // Google: brand-new account = no username yet, or created in the last few minutes.
-      final noUsername = '${auth.user?['username'] ?? ''}'.trim().isEmpty;
+      // Google: the new-user flow starts only if the account was created just now.
       final created = DateTime.tryParse('${auth.user?['createdAt'] ?? ''}');
-      final justCreated = created != null && DateTime.now().difference(created).inMinutes.abs() < 10;
-      if (noUsername || justCreated) {
+      if (created != null && DateTime.now().difference(created).inMinutes.abs() < 10) {
         await markOnboardingPending(auth.user);
       }
       if (!mounted) return;
@@ -208,13 +208,13 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Hello!', style: TextStyle(color: UiColors.plum, fontSize: 54, fontWeight: FontWeight.w400, height: 1.05)),
+        const Text('Hello!', style: TextStyle(color: UiColors.plum, fontSize: 58, fontWeight: FontWeight.w400, height: 1.05)),
         if (!isLogin)
           const Padding(
-            padding: EdgeInsets.only(top: 4),
+            padding: EdgeInsets.only(top: 2),
             child: Text(
-              'Welcome To Tube Pilot',
-              style: TextStyle(color: UiColors.plum, fontSize: 17, fontWeight: FontWeight.w800),
+              'Welcome To TubePilot',
+              style: TextStyle(color: UiColors.plum, fontSize: 18, fontWeight: FontWeight.w800),
             ),
           ),
       ],
@@ -351,7 +351,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             if (isLogin) ...[
               const SizedBox(height: 18),
-              const Center(child: Text('Powered By Tube Pilot', style: TextStyle(color: _hintColor, fontSize: 11.5, fontWeight: FontWeight.w700))),
+              const Center(child: Text('Powered By TubePilot', style: TextStyle(color: _hintColor, fontSize: 11.5, fontWeight: FontWeight.w700))),
             ],
             const SizedBox(height: 4),
           ],
@@ -362,27 +362,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final keyboardOpen = mq.viewInsets.bottom > 0;
-    // Sheet starts at ~25% of the screen height (like the design); smaller while typing.
-    final headerH = keyboardOpen ? mq.padding.top + 84 : (mq.size.height * 0.25).clamp(150.0, 240.0);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Light page -> dark status bar icons.
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.dark,
-        systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
         backgroundColor: UiColors.bg,
-        body: AppBrandBackground(
-          child: AuthHeaderBackground(
-            headerHeight: headerH,
-            header: _header(),
-            sheet: _sheet(),
-          ),
+        body: AuthPatternBackground(
+          headerHeight: keyboardOpen ? 120 : 170,
+          header: _header(),
+          sheet: _sheet(),
         ),
       ),
     );

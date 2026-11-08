@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
+import '../services/payment_gate.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
@@ -115,14 +116,21 @@ class _UploadScreenState extends State<UploadScreen> {
   // UPDATE16: Smart Scheduler Auto-Slotting (real switch stored on the user, see routes/video.js)
   bool autoSlotting = false;
 
+  // Not paid yet -> the whole screen is replaced by a "locked" message (see _buildScreen).
+  void _onGate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
+    PaymentGate.instance.addListener(_onGate);
     _loadInitialData();
   }
 
   @override
   void dispose() {
+    PaymentGate.instance.removeListener(_onGate);
     _ytPlaylistCtrl.dispose();
     for (final v in videos) {
       v.dispose();
@@ -143,6 +151,7 @@ class _UploadScreenState extends State<UploadScreen> {
         ApiService.instance
             .getAutoSlotting()
             .catchError((_) => <String, dynamic>{}),
+        PaymentGate.instance.refresh(), // paid or not
       ]);
       final dash = results[0];
       final yt = results[1];
@@ -588,6 +597,9 @@ class _UploadScreenState extends State<UploadScreen> {
 
   // ---------------- Submit (single video -> /videos/upload, batch -> /videos/bulk-upload) ----------------
   Future<void> _submit() async {
+    // Last guard: not paid -> Rs1 popup, nothing is uploaded.
+    if (!await PaymentGate.instance.ensureUnlocked(context)) return;
+    if (!mounted) return;
     if (videos.isEmpty) {
       showToast(context, context.tr('up_select_video_error'), isError: true);
       return;
@@ -750,6 +762,11 @@ class _UploadScreenState extends State<UploadScreen> {
         }
       }
     } catch (e) {
+      // Backend says "not paid" -> same Rs1 popup.
+      if (e is ApiException && e.code == 'PAYMENT_REQUIRED') {
+        if (mounted) await PaymentGate.instance.ensureUnlocked(context);
+        return;
+      }
       // Insufficient credits from the server -> ₹1 offer first (if eligible / not shown in the last 24h),
       // otherwise the usual upload error message.
       if (await _offerIfNoCredits(e)) return;
@@ -1026,7 +1043,7 @@ class _UploadScreenState extends State<UploadScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
-              onPressed: videos.length >= 100 ? null : _pickMoreVideos,
+              onPressed: (videos.length >= 100 || PaymentGate.instance.locked) ? null : _pickMoreVideos,
               icon: const Icon(Icons.layers_rounded, size: 18),
               label: Text(context.tr('up_bulk_btn')),
             ),
@@ -1035,7 +1052,13 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       body: loadingConnections
           ? const LoadingView()
-          : ListView(
+          : PaymentGate.instance.locked
+              ? LockedFeatureView(
+                  title: 'Uploads are locked',
+                  message: 'Pay once to unlock video uploads, scheduling and channel connect.',
+                  onUnlocked: _loadInitialData,
+                )
+              : ListView(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
               children: [
                 // ---------------- Video picker (bulk) ----------------

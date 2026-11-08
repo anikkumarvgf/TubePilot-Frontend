@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'brand_icons.dart';
 import 'app_decor.dart';
+import 'app_nav.dart';
+import 'offer_video.dart';
 
 /// TubePilot popups (white card + purple), shared by the whole app.
 ///
@@ -12,8 +14,11 @@ import 'app_decor.dart';
 ///
 /// NEW-USER FLOW (signup ke baad, is order mein, har step tabhi jab pichla complete):
 ///   1. Rs1 payment popup
-///   2. YouTube channel connect popup
-///   3. Welcome popup
+///   2. Referral (sirf ek baar)
+///   3. YouTube channel connect popup
+///   4. Welcome popup
+/// "Maybe later" on the Rs1 popup -> referral (once) -> dashboard; upload / live / channel connect
+/// stay locked (PaymentGate) and the Rs1 popup comes again on every app open until paid.
 /// Current step SharedPreferences mein [kOnboardingStageKey] ke andar rehta hai;
 /// Dashboard usi se flow aage badhata hai.
 
@@ -24,24 +29,25 @@ const String kOnboardingStageKey = 'onboarding_stage_v2';
 
 class OnboardingStage {
   static const payment = 'payment';
+  static const referral = 'referral';
   static const connect = 'connect';
   static const welcome = 'welcome';
   static const done = 'done';
 }
 
-/// Stable id of the logged-in account (e-mail never changes between sign-up and later
-/// screens; _id / id may not exist yet right after sign-up).
+/// Stable id of the logged-in account, so the flow of one account never shows
+/// up for another account on the same phone.
 String onboardingOwnerKey(Map<String, dynamic>? user) {
   final u = user ?? const <String, dynamic>{};
-  for (final k in const ['email', '_id', 'id', 'userId']) {
-    final v = '${u[k] ?? ''}'.trim().toLowerCase();
+  for (final k in const ['_id', 'id', 'userId', 'email']) {
+    final v = '${u[k] ?? ''}'.trim();
     if (v.isNotEmpty) return v;
   }
   return '';
 }
 
 /// Call right after a NEW account is created (sign-up). The flow starts at the
-/// Rs1 payment popup.
+/// Rs1 payment popup (then Referral, Connect channel, Welcome).
 Future<void> markOnboardingPending(Map<String, dynamic>? user) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -588,67 +594,119 @@ Future<bool> showSubscriptionOfferPopup(
   required num intro,
   required num plan,
   required int uploads,
+  int? planUploads, // uploads that come with the Rs10 plan (backend `planUploads`); default = same as [uploads]
   bool barrierDismissible = true,
 }) async {
+  OfferVideo.warmUp(); // no-op when the dashboard already started it
   final r = await showDialog<bool>(
     context: context,
-    barrierDismissible: barrierDismissible,
-    builder: (_) => _SubscriptionOfferDialog(intro: intro, plan: plan, uploads: uploads),
+    barrierDismissible: false,
+    barrierColor: const Color(0xFFFAF8FF),
+    useSafeArea: false, // full screen; the page handles the safe area itself
+    builder: (_) => _SubscriptionOfferDialog(
+      intro: intro,
+      plan: plan,
+      uploads: uploads,
+      planUploads: planUploads ?? uploads,
+      canClose: barrierDismissible,
+    ),
   );
+  OfferVideo.release();
   return r == true;
 }
 
+/// FULL-SCREEN Rs1 offer: video card on top, offer card below. The app's bottom bar is hidden.
 class _SubscriptionOfferDialog extends StatelessWidget {
   final num intro;
   final num plan;
   final int uploads;
-  const _SubscriptionOfferDialog({required this.intro, required this.plan, required this.uploads});
+  final int planUploads;
+  final bool canClose;
+  const _SubscriptionOfferDialog({
+    required this.intro,
+    required this.plan,
+    required this.uploads,
+    required this.planUploads,
+    this.canClose = true,
+  });
 
   Widget _row(IconData icon, String text) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(children: [
-          _IconCircle(icon: icon, size: 32, iconSize: 17),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(color: UiColors.purpleDark, fontSize: 13, fontWeight: FontWeight.w600))),
+          _IconCircle(icon: icon, size: 36, iconSize: 18),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text, style: const TextStyle(color: UiColors.purpleDark, fontSize: 14, fontWeight: FontWeight.w700))),
         ]),
       );
 
   @override
   Widget build(BuildContext context) {
-    return AppPopupShell(
-      onClose: () => Navigator.of(context).pop(false),
-      padding: const EdgeInsets.fromLTRB(24, 30, 24, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Start for just ₹$intro',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: UiColors.purpleDark, fontSize: 22, fontWeight: FontWeight.w800),
+    return HideAppNav(
+      child: PopScope(
+        canPop: canClose,
+        child: SizedBox.expand(
+          child: Material(
+            color: const Color(0xFFFAF8FF),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const OfferVideoBox(),
+                        const SizedBox(height: 18),
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: UiColors.cardBorder.withValues(alpha: 0.7)),
+                            boxShadow: [BoxShadow(color: UiColors.purpleDark.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8))],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  'Start for just \u20b9$intro',
+                                  maxLines: 1,
+                                  style: const TextStyle(color: UiColors.purpleDark, fontSize: 26, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text('for $uploads video uploads', style: const TextStyle(color: UiColors.textDim, fontSize: 14)),
+                              const SizedBox(height: 10),
+                              _row(Icons.file_upload_outlined, '$uploads uploads right away'),
+                              _row(Icons.autorenew_rounded, 'When they finish: \u20b9$plan autopay for the next $planUploads uploads'),
+                              _row(Icons.notifications_none_rounded, 'We notify you before every debit'),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Your 1-month period starts on the day the \u20b9$plan is debited, from the same payment method. '
+                                'Cancel anytime in Profile \u2192 Subscription.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: UiColors.textDim, fontSize: 12, height: 1.4),
+                              ),
+                              const SizedBox(height: 14),
+                              AppButton(label: 'Pay \u20b9$intro & Start', onTap: () => Navigator.of(context).pop(true)),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Maybe later', style: TextStyle(color: UiColors.textDim, fontSize: 15, fontWeight: FontWeight.w700)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'for $uploads video uploads',
-            style: const TextStyle(color: UiColors.textDim, fontSize: 13),
-          ),
-          const SizedBox(height: 12),
-          _row(Icons.cloud_upload_outlined, '$uploads uploads right away'),
-          _row(Icons.autorenew_rounded, 'When they finish: ₹$plan autopay for the next $uploads uploads'),
-          _row(Icons.notifications_active_outlined, 'We notify you before every debit'),
-          const SizedBox(height: 10),
-          Text(
-            'Your 1-month period starts on the day the ₹$plan is debited, from the same payment method. '
-            'Cancel anytime in Profile → Subscription.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: UiColors.textDim, fontSize: 11.5, height: 1.4),
-          ),
-          const SizedBox(height: 14),
-          AppButton(label: 'Pay ₹$intro & Start', onTap: () => Navigator.of(context).pop(true)),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Maybe later', style: TextStyle(color: UiColors.textDim)),
-          ),
-        ],
+        ),
       ),
     );
   }

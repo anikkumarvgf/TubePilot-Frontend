@@ -7,6 +7,7 @@ import 'package:flutter_custom_tabs/flutter_custom_tabs.dart' as custom_tabs;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
+import '../services/payment_gate.dart';
 import '../theme/app_theme.dart';
 import '../providers/language_provider.dart';
 import '../widgets/common.dart';
@@ -33,11 +34,11 @@ import 'channel_audit_screen.dart';
 import 'competitor_radar_screen.dart';
 // Quick Actions has a "Live Stream" button.
 import 'live_stream_screen.dart';
+// Starts loading the Rs1 offer video early (fast popup)
+import '../widgets/offer_video.dart';
+import '../services/subscription_pay.dart';
 
 const String kIdeasPopupLastShownKey = 'ideas_popup_last_shown_ms';
-
-/// Result of the Rs1 step in the popup queue.
-enum _Pay { notNeeded, paid, later }
 
 /// Horizontal padding for the whole screen.
 const double _kScreenPadding = 16;
@@ -148,11 +149,13 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    PaymentGate.instance.addListener(_onGate);
+    OfferVideo.warmUp(); // Rs1 video loads while the dashboard data loads
     _load().then((_) async {
       if (!mounted) return;
 
-      // POPUP QUEUE (strict order): Rs1 payment -> connect channel -> welcome.
-      // While it shows something, no other popup is shown on top of it.
+      // NEW USER FLOW (strict order): Rs1 payment -> referral -> connect channel -> welcome.
+      // While this flow is active, no other popup is shown on top of it.
       final inFlow = await _runOnboardingFlow();
       if (!mounted || inFlow) return;
 
@@ -170,8 +173,14 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     });
   }
 
+  // Locked <-> unlocked (user paid): rebuild so the "Uploads" tile changes.
+  void _onGate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    PaymentGate.instance.removeListener(_onGate);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -191,8 +200,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       await _load(showLoader: false);
       if (!mounted) return;
       // Back from the YouTube connect page during the new-user flow:
-      // channel connected -> now show the Welcome popup (last step).
-      if (!wasConnected && youtubeChannel != null && await _onboardingStage() != null) {
+      // channel connected -> continue with the next step (Welcome).
+      if (youtubeChannel != null && await _onboardingStage() == OnboardingStage.connect) {
         await _runOnboardingFlow();
         if (!mounted) return;
       }
@@ -213,110 +222,141 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 
   // ---------------------------------------------------------------------------
-  // POPUP QUEUE (every dashboard open):  1) Rs1 payment -> 2) Connect channel -> 3) Welcome
-  //  * Rs1      : shown when the backend says "eligible" (never paid + PayU keys set).
-  //  * Connect  : shown whenever NO YouTube channel is connected. It does NOT depend on the
-  //               Rs1 popup or on any backend error. Only exception (strict order): if the Rs1
-  //               popup was shown and the user chose "Maybe later", Connect waits for the
-  //               next app open.
-  //  * Welcome  : once, right after a brand-new sign-up (flag stored per e-mail).
+  // NEW USER FLOW:  1) Rs1 payment -> 2) Referral (once) -> 3) Connect YouTube channel -> 4) Welcome
+  // Each step starts only after the previous one is complete. The current step is
+  // stored (per account) so it survives closing the app.
+  //
+  // "Maybe later" on the Rs1 popup: referral (once) -> dashboard. Until he pays, Upload / Live Stream /
+  // channel connect stay locked (PaymentGate + backend paywall) and the Rs1 popup comes again on
+  // every app open.
   // ---------------------------------------------------------------------------
   bool _flowBusy = false;
-
-  // true once the dashboard data loaded OK -> "no channel" really means "not connected".
-  bool _channelChecked = false;
-
-  // Connect popup at most once per app run (the dashboard is re-created after OAuth).
-  static bool _connectShownThisRun = false;
 
   String _ownerKey() => onboardingOwnerKey(context.read<AuthProvider>().user);
 
   Future<String?> _onboardingStage() => getOnboardingStage(_ownerKey());
 
-  /// Returns true when the queue showed something (so no other popup comes on top this time).
+  /// Popup queue, strict order:  1) Rs1 payment -> 2) Referral -> 3) Connect channel -> 4) Welcome.
+  ///  * Rs1 payment: EVERY account that has not paid yet (old or new).
+  ///  * Referral / Connect / Welcome: only right after a brand-new signup, and only once he has paid.
+  ///  * Returns true while this queue wants the screen for itself (no other popup this time).
   Future<bool> _runOnboardingFlow() async {
     if (_flowBusy) return true;
+    final owner = _ownerKey();
+    var stage = await _onboardingStage(); // null = not a fresh signup
     _flowBusy = true;
     try {
-      final owner = _ownerKey();
-      final stage = await _onboardingStage(); // not null = brand-new sign-up, welcome pending
-      var shownAny = false;
+      // Safety: a stage saved by an older build (connect before payment) must not skip the payment.
+      if ((stage == OnboardingStage.connect || stage == OnboardingStage.referral) && youtubeChannel == null) {
+        final st = await PaymentGate.instance.fetchStatus();
+        if (PaymentGate.isLockedStatus(st)) {
+          stage = OnboardingStage.payment;
+          await setOnboardingStage(owner, stage);
+        }
+      }
 
-      // 1) Rs1 payment popup.
-      final pay = await _stagePayment(isNewSignup: stage != null);
-      if (pay == _Pay.later) return true; // Maybe later: Connect + Welcome wait (strict order)
-      if (pay == _Pay.paid) shownAny = true;
-      if (!mounted) return true;
-
-      // 2) Connect YouTube channel popup (any account without a connected channel).
-      if (_channelChecked && youtubeChannel == null && !_connectShownThisRun) {
-        _connectShownThisRun = true;
-        final waiting = await _stageConnect();
-        if (waiting) return true; // gone to connect; the dashboard continues after coming back
-        shownAny = true;
+      // Step 1 - Rs1 payment popup.
+      if (stage == null || stage == OnboardingStage.payment) {
+        final paid = await _stagePayment();
+        if (!paid) {
+          // "Maybe later": new signup sees the referral popup once, then the (locked) dashboard.
+          if (stage == OnboardingStage.payment && mounted) await _stageReferralOnce(owner);
+          return true; // Rs1 popup comes again next time
+        }
+        if (stage == null) return false; // old account: continue with the normal popups
+        stage = OnboardingStage.referral;
+        await setOnboardingStage(owner, stage);
       }
       if (!mounted) return true;
 
-      // 3) Welcome popup (last) - only right after a brand-new sign-up.
-      if (stage != null && (youtubeChannel != null || _connectShownThisRun)) {
+      // Step 2 - Referral popup (once).
+      if (stage == OnboardingStage.referral) {
+        await _stageReferralOnce(owner);
+        stage = OnboardingStage.connect;
+        await setOnboardingStage(owner, stage);
+      }
+      if (!mounted) return true;
+
+      // Step 3 - Connect YouTube channel popup.
+      if (stage == OnboardingStage.connect) {
+        if (youtubeChannel == null) {
+          final waiting = await _stageConnect();
+          if (waiting) {
+            return true; // _onResume continues after the channel is connected
+          }
+        }
+        stage = OnboardingStage.welcome;
+        await setOnboardingStage(owner, stage);
+      }
+      if (!mounted) return true;
+
+      // Step 4 - Welcome popup (last).
+      if (stage == OnboardingStage.welcome) {
         await setOnboardingStage(owner, OnboardingStage.done); // saved BEFORE showing
         if (!mounted) return true;
         await showWelcomePopup(context);
-        return true;
+        // First milestone card of the freshly connected channel comes right after the welcome popup.
+        if (mounted && youtubeChannel != null) await MilestonePopup.checkAndShow(context);
       }
-      return shownAny;
+      return true;
     } finally {
       _flowBusy = false;
     }
   }
 
-  Future<_Pay> _stagePayment({required bool isNewSignup}) async {
-    Map<String, dynamic> st;
-    try {
-      st = Map<String, dynamic>.from(await ApiService.instance.getSubscriptionStatus());
-    } catch (e) {
-      // Backend problem (route missing / server error). Do NOT block the other popups.
-      debugPrint('[Popup] subscription status failed: $e');
-      if (isNewSignup && mounted) {
-        showToast(context, 'Payment offer is not available right now.', isError: true);
-      }
-      return _Pay.notNeeded;
+  /// Referral popup - shown only ONCE per account (flag saved BEFORE showing, so a closed app
+  /// never repeats it).
+  Future<void> _stageReferralOnce(String owner) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'referral_popup_shown_v1_$owner';
+    if (prefs.getBool(key) == true) return;
+    await prefs.setBool(key, true);
+    if (!mounted) return;
+    // TODO(referral): the referral popup was not in the files received so far. Put its call here,
+    // e.g.  await showReferralPopup(context);
+  }
+
+  /// true = payment is done (or not needed / not possible) -> go to the next step.
+  /// false = user did not pay ("Maybe later", closed, payment failed) -> popup comes again next time.
+  Future<bool> _stagePayment() async {
+    final st = await PaymentGate.instance.fetchStatus();
+    if (st == null) {
+      debugPrint('[Onboarding] status failed');
+      return false; // network problem: try again next time, do not skip payment
     }
-    debugPrint('[Popup] subscription status -> eligible=${st['eligible']} offer=${st['offer']}');
-    // Not eligible = already paid / active subscription, or backend has no PayU keys
-    // (PAYU_KEY / PAYU_SALT missing in the server environment).
-    if (st['eligible'] != true) return _Pay.notNeeded;
+    debugPrint('[Onboarding] subscription status -> locked=${st['locked']} eligible=${st['eligible']} offer=${st['offer']}');
+    // Not locked = already paid (Rs1 / diamond pack), or payments unavailable (backend: PayU keys missing).
+    if (!PaymentGate.isLockedStatus(st)) return true;
 
     final offer = st['offer'] is Map ? Map<String, dynamic>.from(st['offer']) : <String, dynamic>{};
     final intro = offer['introAmount'] as num?;
     final plan = offer['planAmount'] as num?;
-    final uploads = (offer['uploads'] as num?)?.toInt();
-    if (intro == null || plan == null || uploads == null) return _Pay.notNeeded;
-    if (!mounted) return _Pay.later;
+    // new backend: introUploads / planUploads, old backend: uploads
+    final uploads = ((offer['introUploads'] ?? offer['uploads']) as num?)?.toInt();
+    final planUploads = ((offer['planUploads'] ?? offer['uploads']) as num?)?.toInt();
+    if (intro == null || plan == null || uploads == null) return true;
+    if (!mounted) return false;
 
     final start = await showSubscriptionOfferPopup(
       context,
       intro: intro,
       plan: plan,
       uploads: uploads,
+      planUploads: planUploads,
       barrierDismissible: false,
     );
-    if (!start || !mounted) return _Pay.later;
+    if (!start || !mounted) return false;
 
-    await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const DiamondStoreScreen(autoStartSubscription: true)));
-    if (!mounted) return _Pay.later;
+    await startSubscriptionPayment(context); // PayU opens directly
+    if (!mounted) return false;
     _load(showLoader: false);
-    try {
-      final st2 = await ApiService.instance.getSubscriptionStatus();
-      return st2['eligible'] != true ? _Pay.paid : _Pay.later; // paid only if it really went through
-    } catch (_) {
-      return _Pay.later;
-    }
+    final st2 = await PaymentGate.instance.fetchStatus();
+    if (st2 == null) return false;
+    return !PaymentGate.isLockedStatus(st2); // payment really went through
   }
 
-  /// true  = the user went to connect (we continue when they come back).
-  /// false = user closed the popup -> carry on.
+  /// true = the user went to connect (we wait for them to come back).
+  /// false = user chose "close" -> continue to the Welcome popup.
   Future<bool> _stageConnect() async {
     final go = await showConnectYoutubePopup(context);
     if (!go || !mounted) return false;
@@ -329,7 +369,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     } catch (e) {
       if (mounted) showApiError(context, e);
     }
-    return true; // could not open the page; the popup returns on the next app open
+    return true; // could not open the page: stay on this step, popup returns next time
   }
 
   Future<void> _launchOAuth(String url) async {
@@ -380,6 +420,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 
   Future<void> _load({bool showLoader = true}) async {
+    PaymentGate.instance.refresh(); // paid or not (locks Upload / Live / channel connect)
     if (showLoader) setState(() => loading = true);
     try {
       final results = await Future.wait([
@@ -425,7 +466,6 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
         unreadCount = notifRes['unreadCount'] ?? 0;
         youtubeChannel = ytRes['success'] == true ? ytRes['channel'] : null;
         facebookStatus = metaRes['facebook'];
-        _channelChecked = true;
         upcomingEvents = events.take(5).toList();
         recentVideos = recent.take(4).toList();
       });
@@ -689,14 +729,25 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                           child: Row(
                             children: [
                               Expanded(
-                                child: _BenefitCell(
-                                  icon: Icons.cloud_upload_rounded,
-                                  label: 'Free Uploads',
-                                  value: '${free.remaining} / ${free.total}',
-                                  onTap: () => Navigator.of(context)
-                                      .push(MaterialPageRoute(builder: (_) => const UploadScreen()))
-                                      .then((_) => _load(showLoader: false)),
-                                ),
+                                // Not paid yet: no free uploads are shown, the tile says "Locked" and opens the Rs1 popup.
+                                child: PaymentGate.instance.locked
+                                    ? _BenefitCell(
+                                        icon: Icons.lock_outline_rounded,
+                                        label: 'Uploads',
+                                        value: 'Locked',
+                                        onTap: () async {
+                                          await PaymentGate.instance.ensureUnlocked(context);
+                                          if (mounted) _load(showLoader: false);
+                                        },
+                                      )
+                                    : _BenefitCell(
+                                        icon: Icons.cloud_upload_rounded,
+                                        label: 'Free Uploads',
+                                        value: '${free.remaining} / ${free.total}',
+                                        onTap: () => Navigator.of(context)
+                                            .push(MaterialPageRoute(builder: (_) => const UploadScreen()))
+                                            .then((_) => _load(showLoader: false)),
+                                      ),
                               ),
                               VerticalDivider(width: 12, thickness: 1, color: UiColors.purpleDark.withValues(alpha: 0.5)),
                               Expanded(

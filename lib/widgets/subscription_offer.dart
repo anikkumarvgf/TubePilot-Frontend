@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
-import '../screens/diamond_store_screen.dart';
+import '../services/subscription_pay.dart';
 import 'app_popups.dart';
 
 /// Welcome-time offer: shown exactly ONE time in the life of the install.
@@ -10,7 +10,7 @@ const String kSubscriptionOfferOnceKey = 'subscription_offer_first_shown_v2';
 /// Action-time offer (upload / AI generate): at most once every 24 hours.
 const String kSubscriptionActionShownKey = 'subscription_offer_action_shown_ms';
 
-/// ₹1 offer popup — never spams the dashboard.
+/// ₹1 offer popup (full screen with video) - never spams the dashboard.
 ///
 ///  * `onlyOnce: true`  -> call from the dashboard right after the welcome popup. Shows a single time ever.
 ///  * `onlyOnce: false` -> call when the user TRIES to upload or generate something and has no credits.
@@ -43,7 +43,9 @@ Future<bool> showSubscriptionOfferIfNeeded(BuildContext context,
     final intro = offer['introAmount'] as num?;
     final plan = offer['planAmount'] as num?;
     if (intro == null || plan == null) return false;
-    final uploads = (offer['introUploads'] as num?)?.toInt() ?? 20;
+    // backend sends introUploads / planUploads (older backend: `uploads`)
+    final uploads = ((offer['introUploads'] ?? offer['uploads']) as num?)?.toInt() ?? 20;
+    final planUploads = ((offer['planUploads'] ?? offer['uploads']) as num?)?.toInt();
 
     // Saved BEFORE showing, so even if the app is closed with the popup open it counts as shown.
     if (onlyOnce) {
@@ -58,11 +60,10 @@ Future<bool> showSubscriptionOfferIfNeeded(BuildContext context,
       intro: intro,
       plan: plan,
       uploads: uploads,
+      planUploads: planUploads,
     );
     if (start && context.mounted) {
-      await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) =>
-              const DiamondStoreScreen(autoStartSubscription: true)));
+      await startSubscriptionPayment(context); // PayU opens directly
       return true;
     }
   } catch (e) {

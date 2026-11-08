@@ -51,6 +51,9 @@ class PayuCheckout implements PayUCheckoutProProtocol {
     Map<String, dynamic>? si;
     try {
       final res = await createOrder();
+      if (res['payu'] is! Map) {
+        throw Exception((res['message'] ?? 'Server did not return payment details.').toString());
+      }
       p = Map<String, dynamic>.from(res['payu'] as Map);
       if (res['si'] is Map) si = Map<String, dynamic>.from(res['si'] as Map);
       _txnid = p['txnid'].toString();
@@ -61,21 +64,25 @@ class PayuCheckout implements PayUCheckoutProProtocol {
 
     _done = Completer<PayuResult>();
 
+    // The SDK crashes / hangs on a null value, so every value is forced to a String.
+    String v(dynamic x) => (x ?? '').toString();
     final params = {
-      PayUPaymentParamKey.key: p['key'],
-      PayUPaymentParamKey.amount: p['amount'],
-      PayUPaymentParamKey.productInfo: p['productinfo'],
-      PayUPaymentParamKey.firstName: p['firstname'],
-      PayUPaymentParamKey.email: p['email'],
-      PayUPaymentParamKey.phone: p['phone'],
-      PayUPaymentParamKey.environment: p['environment'], // "0" = production
-      PayUPaymentParamKey.transactionId: p['txnid'],
-      PayUPaymentParamKey.userCredential: '${p['key']}:${p['userId']}',
-      PayUPaymentParamKey.android_surl: p['surl'],
-      PayUPaymentParamKey.android_furl: p['furl'],
-      PayUPaymentParamKey.ios_surl: p['surl'],
-      PayUPaymentParamKey.ios_furl: p['furl'],
+      PayUPaymentParamKey.key: v(p['key']),
+      PayUPaymentParamKey.amount: v(p['amount']),
+      PayUPaymentParamKey.productInfo: v(p['productinfo']),
+      PayUPaymentParamKey.firstName: v(p['firstname']),
+      PayUPaymentParamKey.email: v(p['email']),
+      PayUPaymentParamKey.phone: v(p['phone']),
+      PayUPaymentParamKey.environment: v(p['environment']), // "0" = production
+      PayUPaymentParamKey.transactionId: v(p['txnid']),
+      PayUPaymentParamKey.userCredential: '${v(p['key'])}:${v(p['userId'])}',
+      PayUPaymentParamKey.android_surl: v(p['surl']),
+      PayUPaymentParamKey.android_furl: v(p['furl']),
+      PayUPaymentParamKey.ios_surl: v(p['surl']),
+      PayUPaymentParamKey.ios_furl: v(p['furl']),
     };
+    debugPrint('[PayU] params: key=${v(p['key']).isEmpty ? 'EMPTY' : 'ok'} amount=${v(p['amount'])} '
+        'env=${v(p['environment'])} surl=${v(p['surl'])} phone=${v(p['phone']).length} si=${si != null}');
     // Autopay details (subscription only). Server decides every value.
     if (si != null) {
       params[PayUPaymentParamKey.payUSIParams] = {
@@ -131,6 +138,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   @override
   generateHash(Map response) async {
     final name = response['hashName']?.toString() ?? '';
+    debugPrint('[PayU] hash requested: $name');
     try {
       final r = await ApiService.instance.payuHash(
         hashName: name,
@@ -138,9 +146,17 @@ class PayuCheckout implements PayUCheckoutProProtocol {
         hashType: response['hashType']?.toString(),
         postSalt: response['postSalt']?.toString(),
       );
-      _pro.hashGenerated(hash: {name: r['hash']});
+      final h = (r['hash'] ?? '').toString();
+      if (h.isEmpty) throw Exception('empty hash from server');
+      _pro.hashGenerated(hash: {name: h});
     } catch (e) {
+      // Without an answer the SDK would show its loader forever. Give it an empty hash (it then
+      // reports onError) and end the payment with a clear message.
       debugPrint('[PayU] hash failed for $name: $e');
+      try {
+        _pro.hashGenerated(hash: {name: ''});
+      } catch (_) {}
+      _finish(PayuResult('error', 'Could not start payment ($name). Please try again.'));
     }
   }
 

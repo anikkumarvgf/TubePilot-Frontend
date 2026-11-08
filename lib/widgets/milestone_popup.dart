@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/api_service.dart';
 import 'app_decor.dart';
+import 'app_nav.dart';
 import 'common.dart';
 import 'milestone_card.dart';
 
@@ -30,6 +31,7 @@ class MilestonePopup {
         barrierDismissible: false,
         // Dark overlay instead of grey, so the home page does not show through.
         barrierColor: Colors.black.withValues(alpha: 0.88),
+        useSafeArea: false, // the dialog handles the safe area itself (full screen)
         builder: (_) => _MilestoneDialog(data: Map<String, dynamic>.from(m)),
       );
       return true;
@@ -177,89 +179,93 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
   ButtonStyle get _btnStyle => ElevatedButton.styleFrom(
         backgroundColor: Colors.white,
         foregroundColor: UiColors.plum,
+        disabledBackgroundColor: Colors.white70,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        padding: const EdgeInsets.symmetric(vertical: 15),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       );
 
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
-    final mq = MediaQuery.of(context);
-    // The card fills the screen: full width (small side margin) and as tall as the space
-    // between the close button and the buttons allows. The bottom bar is hidden while this
-    // popup is open (PopupNavObserver), so the whole height is available.
-    const sideMargin = 8.0;
-    const closeRow = 44.0;
-    const buttonsRow = 74.0;
-    final maxW = math.min(mq.size.width - sideMargin * 2, 480.0);
-    final maxH = mq.size.height - mq.padding.top - mq.padding.bottom - closeRow - buttonsRow - 24;
-    final scale = math.min(maxW / MilestoneCard.cardW, maxH / MilestoneCard.cardH);
-    final cardW = MilestoneCard.cardW * scale;
-    final cardH = MilestoneCard.cardH * scale;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: sideMargin, vertical: 0),
-      child: SafeArea(
-        child: SizedBox(
-          width: cardW,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Close button: inside the safe area (never under the status bar).
-              SizedBox(
-                height: closeRow,
-                child: Align(
+    // FULL SCREEN, no Dialog padding: close button on top, card in the middle, buttons below.
+    // The card is as big as the free space allows (never scrolls, never overlaps) and the
+    // card itself is the white container - there is no empty white area under it.
+    // HideAppNav: the app's bottom bar is hidden while this card is open (it used to stay visible).
+    return HideAppNav(
+      child: SizedBox.expand(
+        child: Material(
+          type: MaterialType.transparency,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Align(
                   alignment: Alignment.centerRight,
                   child: IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                    padding: const EdgeInsets.all(12),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
-              ),
-              // Only this part is exported as the PNG (no buttons in the image).
-              RepaintBoundary(
-                key: _cardKey,
-                child: SizedBox(
-                  width: cardW,
-                  height: cardH,
-                  child: MilestoneCard(
-                    type: '${d['type']}',
-                    value: (d['value'] as num).toInt(),
-                    channelTitle: '${d['channelTitle'] ?? ''}',
-                    channelHandle: _handle, // real handle, null -> card shows "YouTube Channel"
-                    videoTitle: d['videoTitle'] as String?,
-                    channelAvatarUrl: _avatarUrl,
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      const sideMargin = 14.0;
+                      final scale = math.min(
+                        (box.maxWidth - sideMargin * 2) / MilestoneCard.cardW,
+                        (box.maxHeight - 8) / MilestoneCard.cardH,
+                      );
+                      final cardW = MilestoneCard.cardW * scale;
+                      final cardH = MilestoneCard.cardH * scale;
+                      // Only this part is exported as the PNG (no buttons in the image).
+                      return Center(
+                        child: RepaintBoundary(
+                          key: _cardKey,
+                          child: SizedBox(
+                            width: cardW,
+                            height: cardH,
+                            child: MilestoneCard(
+                              type: '${d['type']}',
+                              value: (d['value'] as num).toInt(),
+                              channelTitle: '${d['channelTitle'] ?? ''}',
+                              channelHandle: _handle, // real handle, null -> card shows "YouTube Channel"
+                              videoTitle: d['videoTitle'] as String?,
+                              channelAvatarUrl: _avatarUrl,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _working ? null : _download,
-                      icon: const Icon(Icons.download_rounded, size: 22),
-                      label: const Text('Download'),
-                      style: _btnStyle,
-                    ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _working ? null : _download,
+                          icon: const Icon(Icons.download_rounded, size: 22),
+                          label: const Text('Download'),
+                          style: _btnStyle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _working ? null : _share,
+                          icon: const Icon(Icons.share_rounded, size: 20),
+                          label: const Text('Share'),
+                          style: _btnStyle,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _working ? null : _share,
-                      icon: const Icon(Icons.share_rounded, size: 22),
-                      label: const Text('Share'),
-                      style: _btnStyle,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
