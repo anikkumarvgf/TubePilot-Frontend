@@ -1,10 +1,13 @@
-# Keep rules for release builds.
-# Keep Firebase / Google / OneSignal / Flutter runtime classes that can be stripped
-# by R8 when they are referenced indirectly.
--keep class com.google.firebase.** { *; }
--keep class com.onesignal.** { *; }
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
--keep class androidx.lifecycle.** { *; }
--keep class com.tubepilot.app.** { *; }
--keepattributes *Annotation*
+# Cashfree & PayU SDK rules
+-keep class com.cashfree.** { *; }
+-dontwarn com.cashfree.**
+-keep class com.payu.** { *; }
+-dontwarn com.payu.**
+
+# Google Play Core & Play Services
+-keep class com.google.android.play.core.** { *; }
+-dontwarn com.google.android.play.core.**
+-dontwarn com.google.android.apps.nbu.paisa.**
+
+# AndroidX Window
+-dontwarn androidx.window.**

@@ -29,12 +29,12 @@ class OnboardingStage {
   static const done = 'done';
 }
 
-/// Stable id of the logged-in account, so the flow of one account never shows
-/// up for another account on the same phone.
+/// Stable id of the logged-in account (e-mail never changes between sign-up and later
+/// screens; _id / id may not exist yet right after sign-up).
 String onboardingOwnerKey(Map<String, dynamic>? user) {
   final u = user ?? const <String, dynamic>{};
-  for (final k in const ['_id', 'id', 'userId', 'email']) {
-    final v = '${u[k] ?? ''}'.trim();
+  for (final k in const ['email', '_id', 'id', 'userId']) {
+    final v = '${u[k] ?? ''}'.trim().toLowerCase();
     if (v.isNotEmpty) return v;
   }
   return '';
@@ -244,8 +244,8 @@ class _WelcomeDialog extends StatelessWidget {
                 text: const TextSpan(
                   style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -0.5),
                   children: [
-                    TextSpan(text: 'Tube', style: TextStyle(color: UiColors.purpleDark)),
-                    TextSpan(text: 'Pilot', style: TextStyle(color: UiColors.purple)),
+                    TextSpan(text: 'Tube', style: TextStyle(color: UiColors.inkBlack)),
+                    TextSpan(text: 'Pilot', style: TextStyle(color: UiColors.plum)),
                   ],
                 ),
               ),
@@ -650,6 +650,67 @@ class _SubscriptionOfferDialog extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+// =============================================================================
+// Simple white dialog (icon + title + content + buttons). Used by the Referral popup.
+// =============================================================================
+class AppDialog extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  const AppDialog({super.key, required this.icon, required this.title, required this.content, required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPopupShell(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _IconCircle(icon: icon, size: 64, iconSize: 30),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: UiColors.purpleDark, fontSize: 21, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+          ),
+          const SizedBox(height: 12),
+          DefaultTextStyle(
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: UiColors.textDim, fontSize: 14, height: 1.4),
+            child: content,
+          ),
+          const SizedBox(height: 20),
+          Row(children: actions),
+        ],
+      ),
+    );
+  }
+}
+
+/// Button for [AppDialog]. primary = filled plum, otherwise plain text. Fills half the row.
+class AppDialogButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool loading;
+  const AppDialogButton({super.key, required this.label, required this.onPressed, this.primary = true, this.loading = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: primary
+          ? AppButton(label: label, onTap: onPressed, loading: loading)
+          : TextButton(
+              onPressed: onPressed,
+              style: TextButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+              child: Text(label, style: const TextStyle(color: UiColors.purpleDark, fontSize: 16, fontWeight: FontWeight.w800)),
+            ),
     );
   }
 }

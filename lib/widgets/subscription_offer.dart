@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../screens/diamond_store_screen.dart';
-import 'diwali_popups.dart';
+import 'app_popups.dart';
 
 /// Welcome-time offer: shown exactly ONE time in the life of the install.
 const String kSubscriptionOfferOnceKey = 'subscription_offer_first_shown_v2';
@@ -42,8 +42,8 @@ Future<bool> showSubscriptionOfferIfNeeded(BuildContext context,
         : <String, dynamic>{};
     final intro = offer['introAmount'] as num?;
     final plan = offer['planAmount'] as num?;
-    final diamonds = (offer['diamonds'] as num?)?.toInt();
-    if (intro == null || plan == null || diamonds == null) return false;
+    if (intro == null || plan == null) return false;
+    final uploads = (offer['introUploads'] as num?)?.toInt() ?? 20;
 
     // Saved BEFORE showing, so even if the app is closed with the popup open it counts as shown.
     if (onlyOnce) {
@@ -57,9 +57,7 @@ Future<bool> showSubscriptionOfferIfNeeded(BuildContext context,
       context,
       intro: intro,
       plan: plan,
-      diamonds: diamonds,
-      introUploads: (offer['introUploads'] as num?)?.toInt() ?? 20,
-      planUploads: (offer['planUploads'] as num?)?.toInt() ?? 30,
+      uploads: uploads,
     );
     if (start && context.mounted) {
       await Navigator.of(context).push(MaterialPageRoute(

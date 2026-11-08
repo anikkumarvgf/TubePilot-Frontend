@@ -8,6 +8,7 @@ import 'onboarding_screen.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 import '../widgets/app_decor.dart';
+import '../widgets/app_brand_background.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,23 +16,22 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   // Splash visible for 7 seconds (same as before)
   static const _minSplashDuration = Duration(seconds: 7);
   late final AnimationController _logoController; // scale/fade-in for the logo
   late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
+  late final AnimationController _barController; // loading bar fills over the splash time
 
   @override
   void initState() {
     super.initState();
-    _logoController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900));
-    _logoScale =
-        CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack);
+    _logoController = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _logoScale = CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack);
     _logoFade = CurvedAnimation(parent: _logoController, curve: Curves.easeIn);
     _logoController.forward();
+    _barController = AnimationController(vsync: this, duration: _minSplashDuration)..forward();
     // ⚠️ REMOVED (Google Play policy fix): upfront Permission.photos /
     // Permission.videos requests were removed from here. Google Play's
     // Photo and Video Permissions policy flags apps that request
@@ -50,6 +50,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _logoController.dispose();
+    _barController.dispose();
     super.dispose();
   }
 
@@ -66,7 +67,6 @@ class _SplashScreenState extends State<SplashScreen>
       PushService.initAfterLogin();
     } else {
       final onboarded = await StorageService.isOnboarded();
-      if (!mounted) return;
       next = onboarded ? const LoginScreen() : const OnboardingScreen();
     }
     Navigator.of(context).pushReplacement(
@@ -81,114 +81,109 @@ class _SplashScreenState extends State<SplashScreen>
       width: size,
       height: size,
       fit: BoxFit.contain,
-      // Fallback only fires if the asset is missing from the project/pubspec.
-      errorBuilder: (_, __, ___) => Icon(Icons.play_circle_outline_rounded,
-          color: UiColors.purpleDark, size: size * 0.8),
+      errorBuilder: (_, __, ___) => Icon(Icons.play_circle_outline_rounded, color: UiColors.plum, size: size * 0.8),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Clean white splash: logo, TubePilot wordmark, tagline, spinner + loading text.
+    // Off-white page with the faint play-icon pattern (same as the Setup screen),
+    // logo, "Tube Pilot" (Tube black / Pilot plum), tagline, progress bar, Powered by.
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SizedBox.expand(
-          child: Stack(
-            children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ScaleTransition(
-                      scale: _logoScale,
-                      child: FadeTransition(
-                          opacity: _logoFade, child: _realLogo(size: 110)),
-                    ),
-                    const SizedBox(height: 36),
-                    FadeTransition(
-                      opacity: _logoFade,
-                      child: RichText(
-                        text: const TextSpan(
-                          style: TextStyle(
-                              fontSize: 52,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1.2),
-                          children: [
-                            TextSpan(
-                                text: 'Tube',
-                                style: TextStyle(color: UiColors.inkBlack)),
-                            TextSpan(
-                                text: 'Pilot',
-                                style: TextStyle(color: UiColors.purple)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    FadeTransition(
-                      opacity: _logoFade,
-                      child: Text(
-                        context.tr('splash_tagline'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w400,
-                            color: UiColors.textDim),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Spinner + loading text (lower part of the screen).
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: MediaQuery.sizeOf(context).height * 0.17,
-                child: FadeTransition(
-                  opacity: _logoFade,
-                  child: const Column(
+      backgroundColor: const Color(0xFFFAF9FC),
+      body: AppBrandBackground(
+        child: SafeArea(
+          child: SizedBox.expand(
+            child: Stack(
+              children: [
+                Align(
+                  alignment: const Alignment(0, -0.22),
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
-                        width: 44,
-                        height: 44,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 4,
-                            color: UiColors.purple,
-                            backgroundColor: Color(0xFFE9DDF3)),
+                      ScaleTransition(
+                        scale: _logoScale,
+                        child: FadeTransition(opacity: _logoFade, child: _realLogo(size: 96)),
                       ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Loading Your Creative Journey...',
-                        style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w500,
-                            color: UiColors.purpleDark),
+                      const SizedBox(height: 34),
+                      FadeTransition(
+                        opacity: _logoFade,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: RichText(
+                              text: const TextSpan(
+                                style: TextStyle(fontSize: 56, fontWeight: FontWeight.w800, letterSpacing: -1.2),
+                                children: [
+                                  TextSpan(text: 'Tube ', style: TextStyle(color: Color(0xFF0A0A0A))),
+                                  TextSpan(text: 'Pilot', style: TextStyle(color: UiColors.plum)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      FadeTransition(
+                        opacity: _logoFade,
+                        child: Text(
+                          context.tr('splash_tagline'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w400, color: Color(0xFF77747C)),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              // "Powered by TubePilot" centered at the very bottom.
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 18,
-                child: FadeTransition(
-                  opacity: _logoFade,
-                  child: Center(
-                    child: Text(
-                      context.tr('splash_powered_by'),
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: UiColors.inkBlack),
+                // Loading bar + text.
+                Positioned(
+                  left: 40,
+                  right: 40,
+                  bottom: 76,
+                  child: FadeTransition(
+                    opacity: _logoFade,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedBuilder(
+                          animation: _barController,
+                          builder: (context, _) => ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: LinearProgressIndicator(
+                              value: 0.06 + 0.94 * Curves.easeInOut.transform(_barController.value),
+                              minHeight: 14,
+                              color: UiColors.plum,
+                              backgroundColor: const Color(0xFFDCC8E0),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Loading ......',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: UiColors.plum),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-            ],
+                // "Powered by TubePilot" at the very bottom.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 18,
+                  child: FadeTransition(
+                    opacity: _logoFade,
+                    child: Center(
+                      child: Text(
+                        context.tr('splash_powered_by'),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0A0A0A)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

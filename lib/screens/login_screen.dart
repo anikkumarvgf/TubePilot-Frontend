@@ -7,13 +7,14 @@ import '../services/api_service.dart';
 import '../services/push_service.dart';
 import '../widgets/common.dart';
 import '../widgets/app_decor.dart';
+import '../widgets/app_brand_background.dart';
 import '../widgets/app_popups.dart';
 import '../providers/language_provider.dart';
 import 'username_setup_screen.dart';
 import 'dashboard_screen.dart';
 
 /// Login + Sign Up (one screen, two modes) - layout follows the UI design:
-/// plum header with teal leaves + "Hello!", light rounded sheet with pill fields.
+/// off-white page with the faint play-icon pattern, big plum "Hello!", lavender rounded sheet with pill fields.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -114,9 +115,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.read<AuthProvider>();
     try {
       await auth.googleLogin();
-      // Google: the new-user flow starts only if the account was created just now.
+      // Google: brand-new account = no username yet, or created in the last few minutes.
+      final noUsername = '${auth.user?['username'] ?? ''}'.trim().isEmpty;
       final created = DateTime.tryParse('${auth.user?['createdAt'] ?? ''}');
-      if (created != null && DateTime.now().difference(created).inMinutes.abs() < 10) {
+      final justCreated = created != null && DateTime.now().difference(created).inMinutes.abs() < 10;
+      if (noUsername || justCreated) {
         await markOnboardingPending(auth.user);
       }
       if (!mounted) return;
@@ -205,13 +208,13 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Hello!', style: TextStyle(color: Colors.white, fontSize: 56, fontWeight: FontWeight.w400, height: 1.05)),
+        const Text('Hello!', style: TextStyle(color: UiColors.plum, fontSize: 54, fontWeight: FontWeight.w400, height: 1.05)),
         if (!isLogin)
           const Padding(
-            padding: EdgeInsets.only(top: 2),
+            padding: EdgeInsets.only(top: 4),
             child: Text(
               'Welcome To Tube Pilot',
-              style: TextStyle(color: Color(0xFFD9F3EC), fontSize: 18, fontWeight: FontWeight.w700),
+              style: TextStyle(color: UiColors.plum, fontSize: 17, fontWeight: FontWeight.w800),
             ),
           ),
       ],
@@ -221,7 +224,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _sheet() {
     return SingleChildScrollView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(30, 26, 30, 20),
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(30, 22, 30, 14 + MediaQuery.paddingOf(context).bottom),
       child: Form(
         key: _formKey,
         child: Column(
@@ -243,8 +247,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
             ],
             Text(isLogin ? 'Login' : 'Sign Up',
-                style: const TextStyle(color: UiColors.plum, fontSize: 32, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 18),
+                style: const TextStyle(color: UiColors.plum, fontSize: 30, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 14),
 
             TextFormField(
               controller: _emailCtrl,
@@ -321,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 10),
               Center(child: Text(slowServerHint!, style: const TextStyle(color: UiColors.textDim, fontSize: 12), textAlign: TextAlign.center)),
             ],
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             const Center(child: Text('Or login with', style: TextStyle(color: _hintColor, fontSize: 12, fontWeight: FontWeight.w700))),
             const SizedBox(height: 12),
             _googleButton(),
@@ -349,7 +353,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 18),
               const Center(child: Text('Powered By Tube Pilot', style: TextStyle(color: _hintColor, fontSize: 11.5, fontWeight: FontWeight.w700))),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -358,20 +362,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final mq = MediaQuery.of(context);
+    final keyboardOpen = mq.viewInsets.bottom > 0;
+    // Sheet starts at ~25% of the screen height (like the design); smaller while typing.
+    final headerH = keyboardOpen ? mq.padding.top + 84 : (mq.size.height * 0.25).clamp(150.0, 240.0);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
-        backgroundColor: UiColors.plum,
-        body: AuthHeaderBackground(
-          headerHeight: keyboardOpen ? 135 : 230,
-          showPlant: !isLogin && !keyboardOpen,
-          header: _header(),
-          sheet: _sheet(),
+        backgroundColor: UiColors.bg,
+        body: AppBrandBackground(
+          child: AuthHeaderBackground(
+            headerHeight: headerH,
+            header: _header(),
+            sheet: _sheet(),
+          ),
         ),
       ),
     );

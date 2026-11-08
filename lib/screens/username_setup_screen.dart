@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_custom_tabs/flutter_custom_tabs.dart' as custom_tabs;
 import '../providers/language_provider.dart';
 import '../services/auth_provider.dart';
 import '../services/api_service.dart';
@@ -8,8 +7,8 @@ import '../theme/app_theme.dart';
 import '../widgets/common.dart';
 import '../widgets/custom_dropdown.dart';
 import '../widgets/app_brand_background.dart';
-import '../widgets/diwali_decor.dart';
-import '../widgets/diwali_popups.dart';
+import '../widgets/app_decor.dart';
+import '../widgets/app_popups.dart';
 import 'dashboard_screen.dart';
 
 class UsernameSetupScreen extends StatefulWidget {
@@ -41,6 +40,12 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     _prefillSuggestedUsername();
   }
 
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    super.dispose();
+  }
+
   void _prefillSuggestedUsername() {
     final user = context.read<AuthProvider>().user ?? {};
     String base = (user['name'] ?? '').toString().trim();
@@ -51,15 +56,11 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     base = base.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (base.length < 3) base = 'creator';
     if (base.length > 15) base = base.substring(0, 15);
-    final suffix =
-        (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
+    final suffix = (DateTime.now().millisecondsSinceEpoch % 900 + 100).toString();
     _usernameCtrl.text = '${base}_$suffix';
   }
 
-  // ⚠️ FIX (Boss request): language picker now opens as a bottom sheet
-  // (drag handle + title + tick on selected item) instead of the old
-  // top-overlay DropdownButtonFormField menu — same visual pattern as the
-  // "Select Platform" sheet already used elsewhere in the app.
+  // Language picker opens as a bottom sheet (drag handle + title + tick on the selected item).
   Future<void> _openLanguageSheet() async {
     final selected = await showModalBottomSheet<String>(
       context: context,
@@ -88,18 +89,13 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(context.tr('select_language_label'),
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w800)),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                   ),
                 ),
                 const SizedBox(height: 8),
                 ..._languages.map((lang) => ListTile(
-                      title: Text(lang,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      trailing: lang == _language
-                          ? const Icon(Icons.check_rounded,
-                              color: AppColors.purple)
-                          : null,
+                      title: Text(lang, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      trailing: lang == _language ? const Icon(Icons.check_rounded, color: AppColors.purple) : null,
                       onTap: () => Navigator.pop(sheetContext, lang),
                     )),
                 const SizedBox(height: 8),
@@ -117,17 +113,18 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
   Future<void> _save() async {
     final username = _usernameCtrl.text.trim().replaceFirst('@', '');
     if (username.length < 3) {
-      showToast(context, context.tr('username_min_length_error'),
-          isError: true);
+      showToast(context, context.tr('username_min_length_error'), isError: true);
       return;
     }
     setState(() => _loading = true);
     try {
-      await context
-          .read<AuthProvider>()
-          .setupUsername(username: username, language: _language);
+      await context.read<AuthProvider>().setupUsername(username: username, language: _language);
       if (!mounted) return;
-      await _showWelcomeFlow();
+      await _showReferralDialog();
+      if (!mounted) return;
+      // Connect-channel + Welcome popups now come from the Dashboard, AFTER the Rs1
+      // payment popup (strict order: Rs1 -> Connect -> Welcome).
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen()));
     } catch (e) {
       if (mounted) showApiError(context, e);
     } finally {
@@ -135,12 +132,11 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     }
   }
 
-  // Referral dialog (Diwali style).
+  // Referral dialog (white).
   //   * empty box      -> stays open, shows "enter a code or tap Skip"
   //   * wrong/invalid  -> stays open, shows the backend's message under the box
   //   * valid code     -> success toast, then closes
   //   * "Skip"         -> the ONLY way to leave without a valid code
-  // TODO: move the two English fallback messages into app_strings.dart.
   Future<void> _showReferralDialog() async {
     final referralCtrl = TextEditingController();
     bool submitting = false;
@@ -151,7 +147,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
       barrierDismissible: false,
       barrierColor: Colors.black54,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => DiwaliDialog(
+        builder: (dialogContext, setDialogState) => AppDialog(
           icon: Icons.card_giftcard_rounded,
           title: context.tr('referral_dialog_title'),
           content: Column(
@@ -164,10 +160,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                 enabled: !submitting,
                 textCapitalization: TextCapitalization.characters,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: DiwaliColors.inkBlack,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1),
+                style: const TextStyle(color: UiColors.inkBlack, fontWeight: FontWeight.w700, letterSpacing: 1),
                 onChanged: (_) {
                   if (errorText != null) setDialogState(() => errorText = null);
                 },
@@ -177,22 +170,18 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   errorMaxLines: 3,
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                        color: DiwaliColors.gold.withValues(alpha: 0.7)),
+                    borderSide: const BorderSide(color: UiColors.cardBorder),
                   ),
                   disabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                        color: DiwaliColors.gold.withValues(alpha: 0.4)),
+                    borderSide: BorderSide(color: UiColors.cardBorder.withValues(alpha: 0.6)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                        color: DiwaliColors.purple, width: 1.6),
+                    borderSide: const BorderSide(color: UiColors.plum, width: 1.6),
                   ),
                   errorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -200,21 +189,20 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   ),
                   focusedErrorBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide:
-                        const BorderSide(color: Colors.redAccent, width: 1.6),
+                    borderSide: const BorderSide(color: Colors.redAccent, width: 1.6),
                   ),
                 ),
               ),
             ],
           ),
           actions: [
-            DiwaliDialogButton(
+            AppDialogButton(
               label: context.tr('skip'),
               primary: false,
               onPressed: submitting ? null : () => Navigator.pop(dialogContext),
             ),
             const SizedBox(width: 10),
-            DiwaliDialogButton(
+            AppDialogButton(
               label: context.tr('apply'),
               loading: submitting,
               onPressed: submitting
@@ -222,8 +210,7 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                   : () async {
                       final code = referralCtrl.text.trim();
                       if (code.isEmpty) {
-                        setDialogState(() => errorText =
-                            'Please enter a referral code, or tap Skip.');
+                        setDialogState(() => errorText = 'Please enter a referral code, or tap Skip.');
                         return;
                       }
                       setDialogState(() {
@@ -231,12 +218,10 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                         errorText = null;
                       });
                       try {
-                        final res =
-                            await ApiService.instance.applyReferralCode(code);
+                        final res = await ApiService.instance.applyReferralCode(code);
                         // Even a 200 response can mean "not matched" (success:false) -> stay open.
                         if (res['success'] == false) {
-                          final failMsg =
-                              (res['message'] ?? '').toString().trim();
+                          final failMsg = (res['message'] ?? '').toString().trim();
                           if (dialogContext.mounted) {
                             setDialogState(() {
                               submitting = false;
@@ -248,14 +233,11 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
                           return;
                         }
                         if (mounted) {
-                          showToast(context,
-                              res['message'] ?? context.tr('referral_applied'),
-                              isSuccess: true);
+                          showToast(context, res['message'] ?? context.tr('referral_applied'), isSuccess: true);
                         }
                         if (dialogContext.mounted) Navigator.pop(dialogContext);
                       } catch (e) {
-                        final msg = (e is ApiException &&
-                                e.message.trim().isNotEmpty)
+                        final msg = (e is ApiException && e.message.trim().isNotEmpty)
                             ? e.message
                             : 'Referral code did not match. Please check and try again.';
                         if (dialogContext.mounted) {
@@ -273,101 +255,13 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     );
   }
 
-  // Same Custom Tabs launcher profile_screen.dart's _launchOAuth() uses —
-  // kept consistent so every OAuth entry point in the app (Settings/Profile
-  // connect AND this first-run popup) opens the same in-app browser sheet
-  // instead of switching to an external browser app.
-  Future<void> _launchOAuth(String url) async {
-    await custom_tabs.launchUrl(
-      Uri.parse(url),
-      customTabsOptions: custom_tabs.CustomTabsOptions(
-        shareState: custom_tabs.CustomTabsShareState.off,
-        urlBarHidingEnabled: true,
-        showTitle: true,
-      ),
-      safariVCOptions: const custom_tabs.SafariViewControllerOptions(
-        barCollapsingEnabled: true,
-        dismissButtonStyle:
-            custom_tabs.SafariViewControllerDismissButtonStyle.close,
-      ),
-    );
-  }
-
-  // "Connect Your Channel" popup (Diwali style). "Connect" starts the same
-  // YouTube OAuth flow used elsewhere in the app (GET /youtube/oauth/url ->
-  // Custom Tabs); "Skip" just closes it.
-  Future<void> _showChannelConnectDialog() async {
-    bool connecting = false;
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black54,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => DiwaliDialog(
-          icon: Icons.link_rounded,
-          title: context.tr('channel_connect_dialog_title'),
-          content: Text(context.tr('channel_connect_dialog_body')),
-          actions: [
-            DiwaliDialogButton(
-              label: context.tr('skip'),
-              primary: false,
-              onPressed: connecting ? null : () => Navigator.pop(dialogContext),
-            ),
-            const SizedBox(width: 10),
-            DiwaliDialogButton(
-              label: context.tr('connect_channel_btn'),
-              loading: connecting,
-              onPressed: connecting
-                  ? null
-                  : () async {
-                      setDialogState(() => connecting = true);
-                      try {
-                        final res =
-                            await ApiService.instance.getYoutubeOAuthUrl();
-                        final url = res['url'] as String?;
-                        if (url != null) {
-                          await _launchOAuth(url);
-                        }
-                      } catch (e) {
-                        if (mounted) showApiError(context, e);
-                      } finally {
-                        if (dialogContext.mounted) Navigator.pop(dialogContext);
-                      }
-                    },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showWelcomeFlow() async {
-    // UPDATED: the plain "Welcome to Tube Pilot! (20 credits + 10 diamonds)"
-    // popup is REMOVED. The Diwali welcome card already appears on the
-    // dashboard for new accounts.
-    // Flow: Referral -> Channel Connect (+Skip) -> Dashboard.
-    await _showReferralDialog();
-    if (!mounted) return;
-
-    await _showChannelConnectDialog();
-    if (!mounted) return;
-
-    // ⚠️ FIX: the Idea popup used to open here with a generic 'Tech' niche —
-    // even when the user tapped Skip and had NO channel. Removed. Ideas now
-    // appear only from the dashboard, only for a connected channel, using
-    // that channel's own category (see dashboard_screen.dart).
-    Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()));
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final avatar = auth.user?['avatar'];
 
     return Scaffold(
-      // ⚠️ FIX (Boss request): same off-white base + watermark as Splash,
-      // for a modern/consistent look on the profile setup step.
+      // Same off-white base + watermark as Splash.
       backgroundColor: const Color(0xFFFAF7FC),
       body: AppBrandBackground(
         child: SafeArea(
@@ -378,56 +272,42 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
               children: [
                 const SizedBox(height: 30),
                 Text(context.tr('setup_profile_title'),
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.w800)),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 24),
                 Center(
                   child: Container(
                     width: 82,
                     height: 82,
-                    decoration: BoxDecoration(
-                        gradient: AppColors.gradient, shape: BoxShape.circle),
+                    decoration: BoxDecoration(gradient: AppColors.gradient, shape: BoxShape.circle),
                     child: avatar != null && avatar.toString().isNotEmpty
-                        ? ClipOval(
-                            child: Image.network(avatar, fit: BoxFit.cover))
-                        : const Center(
-                            child: Icon(Icons.person_rounded,
-                                color: Colors.white, size: 36)),
+                        ? ClipOval(child: Image.network(avatar, fit: BoxFit.cover))
+                        : const Center(child: Icon(Icons.person_rounded, color: Colors.white, size: 36)),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(context.tr('username_label'),
-                    style: TextStyle(
-                        color: context.surfaces.textDim, fontSize: 13)),
+                    style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
                 const SizedBox(height: 4),
                 Text(context.tr('username_suggested_hint'),
-                    style: TextStyle(
-                        color: context.surfaces.textDim, fontSize: 11.5)),
+                    style: TextStyle(color: context.surfaces.textDim, fontSize: 11.5)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _usernameCtrl,
                   decoration: const InputDecoration(
-                      hintText: '@tech_creator',
-                      prefixIcon:
-                          Icon(Icons.alternate_email_rounded, size: 18)),
+                      hintText: '@tech_creator', prefixIcon: Icon(Icons.alternate_email_rounded, size: 18)),
                 ),
                 const SizedBox(height: 16),
                 Text(context.tr('select_language_label'),
-                    style: TextStyle(
-                        color: context.surfaces.textDim, fontSize: 13)),
+                    style: TextStyle(color: context.surfaces.textDim, fontSize: 13)),
                 const SizedBox(height: 6),
-                // ⚠️ FIX: bottom-sheet PickerField instead of CustomDropdown.
+                // Bottom-sheet PickerField instead of CustomDropdown.
                 PickerField(
                   value: _language,
                   onTap: _openLanguageSheet,
-                  prefixIcon: const Icon(Icons.language_rounded,
-                      size: 18, color: AppColors.purple),
+                  prefixIcon: const Icon(Icons.language_rounded, size: 18, color: AppColors.purple),
                 ),
                 const SizedBox(height: 30),
-                GradientButton(
-                    label: context.tr('continue_btn'),
-                    loading: _loading,
-                    onPressed: _save),
+                GradientButton(label: context.tr('continue_btn'), loading: _loading, onPressed: _save),
               ],
             ),
           ),

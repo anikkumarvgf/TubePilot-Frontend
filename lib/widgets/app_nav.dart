@@ -77,3 +77,32 @@ class _HideAppNavState extends State<HideAppNav> {
   @override
   Widget build(BuildContext context) => widget.child;
 }
+
+/// Add to MaterialApp.navigatorObservers. While ANY popup route (dialog, bottom sheet,
+/// menu) is open, the global bottom bar is hidden, so a popup is never drawn "behind" it.
+class PopupNavObserver extends NavigatorObserver {
+  final Set<Route<dynamic>> _tracked = <Route<dynamic>>{};
+
+  void _add(Route<dynamic>? r) {
+    if (r is PopupRoute && _tracked.add(r)) AppNav.instance.pushHide();
+  }
+
+  void _remove(Route<dynamic>? r) {
+    if (r != null && _tracked.remove(r)) AppNav.instance.popHide();
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _add(route);
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _remove(route);
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) => _remove(route);
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _remove(oldRoute);
+    _add(newRoute);
+  }
+}

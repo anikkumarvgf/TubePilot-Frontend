@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/services.dart';
@@ -20,7 +19,7 @@ import 'screens/my_videos_screen.dart';
 import 'widgets/common.dart';
 import 'widgets/app_brand_background.dart';
 import 'widgets/app_nav.dart';
-import 'widgets/diwali_decor.dart' show DiwaliBottomNav;
+import 'widgets/app_decor.dart' show AppBottomNav, UiColors;
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -58,37 +57,26 @@ Future<void> _initBackgroundServices() async {
   try {
     await Firebase.initializeApp().timeout(
       const Duration(seconds: 8),
-      onTimeout: () =>
-          throw Exception('Firebase.initializeApp() timed out after 8s'),
+      onTimeout: () => throw Exception('Firebase.initializeApp() timed out after 8s'),
     );
   } catch (e) {
-    debugPrint(
-        '⚠️ Firebase init failed/skipped, continuing without push notifications: $e');
+    debugPrint('⚠️ Firebase init failed/skipped, continuing without push notifications: $e');
   }
 
   try {
     OneSignal.initialize(oneSignalAppId);
     OneSignal.Notifications.requestPermission(true);
   } catch (e) {
-    debugPrint(
-        '⚠️ OneSignal init failed/skipped, continuing without diamond-alert push: $e');
+    debugPrint('⚠️ OneSignal init failed/skipped, continuing without diamond-alert push: $e');
   }
 }
 
-/// ⚠️ NEW — GLOBAL FESTIVAL BACKGROUND (one place for all ~40 screens).
-///
-/// Wraps every page route in AppBrandBackground, then hands over to the
-/// normal platform transition. Why here and not in MaterialApp.builder:
-/// a single background behind the Navigator would show the OLD screen
-/// through the NEW (transparent) one during page transitions. Drawing the
-/// background inside each route keeps every page opaque while animating.
-///
-/// Per-screen opt-out: a screen that wraps itself in
-/// AppBrandBackground(excludeFromFestival: true) (like Splash) or sets an
-/// explicit Scaffold(backgroundColor: ...) keeps its own look.
-class _FestivalPageTransitionsBuilder extends PageTransitionsBuilder {
+/// Wraps every page route in AppBrandBackground, then hands over to the normal
+/// platform transition. Drawing the background inside each route keeps every page
+/// opaque while animating (the old screen never shows through the new one).
+class _PageBackgroundTransitionsBuilder extends PageTransitionsBuilder {
   final PageTransitionsBuilder inner;
-  const _FestivalPageTransitionsBuilder(this.inner);
+  const _PageBackgroundTransitionsBuilder(this.inner);
 
   @override
   Widget buildTransitions<T>(
@@ -108,12 +96,10 @@ class _FestivalPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
-const PageTransitionsTheme _festivalTransitions = PageTransitionsTheme(
+const PageTransitionsTheme _pageTransitions = PageTransitionsTheme(
   builders: {
-    TargetPlatform.android:
-        _FestivalPageTransitionsBuilder(ZoomPageTransitionsBuilder()),
-    TargetPlatform.iOS:
-        _FestivalPageTransitionsBuilder(CupertinoPageTransitionsBuilder()),
+    TargetPlatform.android: _PageBackgroundTransitionsBuilder(ZoomPageTransitionsBuilder()),
+    TargetPlatform.iOS: _PageBackgroundTransitionsBuilder(CupertinoPageTransitionsBuilder()),
   },
 );
 
@@ -157,24 +143,12 @@ class _TubePilotAppState extends State<TubePilotApp> {
     try {
       final existingId = OneSignal.User.pushSubscription.id;
       if (existingId != null) {
-        ApiService.instance
-            .registerOneSignalPlayerId(existingId)
-            .catchError((error) {
-          if (kDebugMode) debugPrint('OneSignal player ID sync failed: $error');
-          return <String, dynamic>{};
-        });
+        ApiService.instance.registerOneSignalPlayerId(existingId).catchError((_) {});
       }
       OneSignal.User.pushSubscription.addObserver((state) {
         final playerId = OneSignal.User.pushSubscription.id;
         if (playerId != null) {
-          ApiService.instance
-              .registerOneSignalPlayerId(playerId)
-              .catchError((error) {
-            if (kDebugMode) {
-              debugPrint('OneSignal player ID sync failed: $error');
-            }
-            return <String, dynamic>{};
-          });
+          ApiService.instance.registerOneSignalPlayerId(playerId).catchError((_) {});
         }
       });
     } catch (e) {
@@ -219,8 +193,7 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (_lastHandledUri == uri) return;
     _lastHandledUri = uri;
 
-    final hasYoutubeParam =
-        uri.queryParameters.containsKey('youtube_connected');
+    final hasYoutubeParam = uri.queryParameters.containsKey('youtube_connected');
     final hasDriveParam = uri.queryParameters.containsKey('drive_connected');
     final hasMetaParam = uri.queryParameters.containsKey('meta_connected');
     final ctx = navigatorKey.currentContext;
@@ -231,36 +204,18 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (hasYoutubeParam) {
       final connected = uri.queryParameters['youtube_connected'] == '1';
       if (ctx != null) {
-        showToast(
-            ctx,
-            connected
-                ? 'YouTube channel connected!'
-                : 'Failed to connect YouTube channel',
-            isSuccess: connected,
-            isError: !connected);
+        showToast(ctx, connected ? 'YouTube channel connected!' : 'Failed to connect YouTube channel', isSuccess: connected, isError: !connected);
       }
     } else if (hasDriveParam) {
       final connected = uri.queryParameters['drive_connected'] == '1';
       if (ctx != null) {
-        showToast(
-            ctx,
-            connected
-                ? 'Google Drive connected!'
-                : 'Failed to connect Google Drive',
-            isSuccess: connected,
-            isError: !connected);
+        showToast(ctx, connected ? 'Google Drive connected!' : 'Failed to connect Google Drive', isSuccess: connected, isError: !connected);
       }
     } else if (hasMetaParam) {
       metaSuccess = uri.queryParameters['meta_connected'] == '1';
       metaMultiplePages = uri.queryParameters['multiple_pages'] == '1';
       if (ctx != null && !metaMultiplePages) {
-        showToast(
-            ctx,
-            metaSuccess
-                ? 'Facebook / Instagram connected!'
-                : 'Failed to connect Facebook / Instagram',
-            isSuccess: metaSuccess,
-            isError: !metaSuccess);
+        showToast(ctx, metaSuccess ? 'Facebook / Instagram connected!' : 'Failed to connect Facebook / Instagram', isSuccess: metaSuccess, isError: !metaSuccess);
       }
     }
 
@@ -270,8 +225,7 @@ class _TubePilotAppState extends State<TubePilotApp> {
     );
 
     if (hasMetaParam && metaSuccess && metaMultiplePages) {
-      navigatorKey.currentState?.push(
-          MaterialPageRoute(builder: (_) => const MetaPagePickerScreen()));
+      navigatorKey.currentState?.push(MaterialPageRoute(builder: (_) => const MetaPagePickerScreen()));
     }
   }
 
@@ -285,8 +239,7 @@ class _TubePilotAppState extends State<TubePilotApp> {
     if (videoId == null || videoId.isEmpty) return;
 
     navigatorKey.currentState?.push(
-      MaterialPageRoute(
-          builder: (_) => MyVideosScreen(highlightVideoId: videoId)),
+      MaterialPageRoute(builder: (_) => MyVideosScreen(highlightVideoId: videoId)),
     );
   }
 
@@ -304,8 +257,7 @@ class _TubePilotAppState extends State<TubePilotApp> {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
-        ChangeNotifierProvider<LanguageProvider>.value(
-            value: widget.languageProvider),
+        ChangeNotifierProvider<LanguageProvider>.value(value: widget.languageProvider),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -313,51 +265,52 @@ class _TubePilotAppState extends State<TubePilotApp> {
             languageProvider: widget.languageProvider,
             child: MaterialApp(
               navigatorKey: navigatorKey,
+              navigatorObservers: [PopupNavObserver()],
               title: 'TubePilot',
               debugShowCheckedModeBanner: false,
-              theme: AppTheme.light
-                  .copyWith(pageTransitionsTheme: _festivalTransitions),
-              darkTheme: AppTheme.dark
-                  .copyWith(pageTransitionsTheme: _festivalTransitions),
+              theme: AppTheme.light.copyWith(pageTransitionsTheme: _pageTransitions),
+              darkTheme: AppTheme.dark.copyWith(pageTransitionsTheme: _pageTransitions),
               themeMode: themeProvider.themeMode,
-              // ⚠️ NEW — SYSTEM NAV BAR (buttons + gestures) ka ek hi hal, sab screens ke liye.
-              // Android ka neeche wala system area (3-button bar ~48dp, gesture mode mein
-              // bahut chhota/0) app ke content ko dabaye nahi — saari screens uske UPAR
-              // banti hain, aur woh patti cream rehti hai. Keyboard khulne par `padding`
-              // apne aap 0 ho jaata hai, isliye keyboard ke upar extra gap nahi banta.
-              // ⚠️ NEW — ONE bottom nav bar for the whole app. It is drawn here, below the
-              // Navigator, so it shows on every screen (My Videos, Wallet, ...) after login and
-              // never overlaps content: each screen simply gets the space above the bar.
-              // Hidden while the keyboard is open, and on Splash/Login (Dashboard not alive).
+              // ONE bottom nav bar for the whole app, drawn here below the Navigator so it
+              // shows on every screen after login. It is visible only while the Dashboard is
+              // alive and hidden while the keyboard is open.
+              // Android system bar: transparent. Screens WITHOUT the nav bar (Splash, Login,
+              // Sign Up ...) keep the full height and paint behind it, so there is no
+              // cream strip any more. Only when the nav bar is shown do screens give up the
+              // bottom inset (the bar itself already sits above the system buttons).
               builder: (context, child) {
-                final bottom = MediaQuery.paddingOf(context).bottom;
-                final keyboardOpen =
-                    MediaQuery.viewInsetsOf(context).bottom > 0;
-                return ColoredBox(
-                  color: AppColors.festivalIvory,
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: bottom),
-                    child: MediaQuery.removePadding(
-                      context: context,
-                      removeBottom: true,
+                final mq = MediaQuery.of(context);
+                final keyboardOpen = mq.viewInsets.bottom > 0;
+                // Text size: never BIGGER than the design (a phone with a large system font
+                // used to push texts out of cards / popups). Smaller is still respected.
+                return MediaQuery(
+                  data: mq.copyWith(textScaler: mq.textScaler.clamp(maxScaleFactor: 1.0)),
+                  child: Builder(
+                    builder: (context) => ColoredBox(
+                      color: UiColors.bg,
                       child: AnimatedBuilder(
                         animation: AppNav.instance,
                         builder: (context, _) {
-                          final showNav =
-                              AppNav.instance.visible && !keyboardOpen;
+                          // Bar is hidden while the keyboard OR any popup / bottom sheet is open.
+                          final showNav = AppNav.instance.visible && !keyboardOpen;
                           return Column(
                             children: [
-                              Expanded(child: child ?? const SizedBox.shrink()),
+                              Expanded(
+                                child: MediaQuery.removePadding(
+                                  context: context,
+                                  removeBottom: showNav,
+                                  child: child ?? const SizedBox.shrink(),
+                                ),
+                              ),
                               if (showNav)
-                                DiwaliBottomNav(
+                                AppBottomNav(
                                   currentIndex: AppNav.instance.tab,
                                   onTap: (i) {
                                     AppNav.instance.setTab(i);
                                     // Back to the Dashboard (closes any pushed screens / dialogs).
                                     final r = AppNav.instance.dashboardRoute;
                                     if (r != null && r.isActive) {
-                                      navigatorKey.currentState
-                                          ?.popUntil((x) => x == r);
+                                      navigatorKey.currentState?.popUntil((x) => x == r);
                                     }
                                   },
                                 ),

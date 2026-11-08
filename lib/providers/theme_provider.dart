@@ -6,5 +6,4 @@ import 'package:flutter/material.dart';
 class ThemeProvider extends ChangeNotifier {
   bool get isDark => false;
   ThemeMode get themeMode => ThemeMode.light;
-  String get festivalBackgroundAsset => 'assets/diwali_bg.png';
 }

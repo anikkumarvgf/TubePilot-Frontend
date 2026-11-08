@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../providers/language_provider.dart';
-import 'app_decor.dart';
 
 // ---------------- Toast ----------------
 // ⚠️ FIX (Boss request — "notification niche se green background me aata
@@ -356,93 +355,8 @@ class StatCard extends StatelessWidget {
   }
 }
 
-// ---------------- Bottom Nav (floating pill) ----------------
-// Same 5 tabs, same tap behavior. Cream pill + gold border; selected tab gets a
-// soft plum tint with plum icon + label, others show a dim icon with its label.
-class AppBottomNav extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTap;
-  const AppBottomNav({super.key, required this.currentIndex, required this.onTap});
-
-  static const List<({IconData filled, IconData outline, String label})> _items = [
-    (filled: Icons.home_rounded, outline: Icons.home_outlined, label: 'Home'),
-    (filled: Icons.cloud_upload_rounded, outline: Icons.cloud_upload_outlined, label: 'Upload'),
-    (filled: Icons.video_collection_rounded, outline: Icons.video_collection_outlined, label: 'Videos'),
-    (filled: Icons.insights_rounded, outline: Icons.insights_outlined, label: 'Analytics'),
-    (filled: Icons.person_rounded, outline: Icons.person_outline_rounded, label: 'Profile'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Container(
-          height: 66,
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [UiColors.cardTop, UiColors.cardBottom],
-            ),
-            borderRadius: BorderRadius.circular(33),
-            border: Border.all(color: UiColors.cardBorder.withValues(alpha: 0.9), width: 1),
-            boxShadow: [
-              BoxShadow(color: UiColors.goldDeep.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
-            ],
-          ),
-          child: Row(
-            children: List.generate(_items.length, (i) {
-              final item = _items[i];
-              final selected = i == currentIndex;
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onTap(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: selected ? UiColors.purple.withValues(alpha: 0.10) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          selected ? item.filled : item.outline,
-                          color: selected ? UiColors.purpleDark : UiColors.mauve,
-                          size: 23,
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(
-                            item.label,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                              color: selected ? UiColors.purpleDark : UiColors.purpleDeep.withValues(alpha: 0.75),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// NOTE: the old AppBottomNav lived here. The app now uses the one in
+// widgets/app_decor.dart (drawn from main.dart), so this duplicate was removed.
 
 // ---------------- Loading / Empty states ----------------
 class LoadingView extends StatelessWidget {

@@ -18,9 +18,10 @@ String formatCount(num n) {
       );
 }
 
-// Palette: warm white canvas, plum purple, gold.
+// Palette: warm white canvas, plum, gold.
 class _C {
-  static const purpleDark = Color(0xFF4B1A5E);
+  static const plum = Color(0xFF52235E);
+  static const purpleDark = Color(0xFF4A1A52);
   static const purple = Color(0xFF7A2C8C);
   static const purpleDeep = Color(0xFF5A1F6E);
   static const mauve = Color(0xFF9B6F94);
@@ -38,14 +39,14 @@ const TextStyle _script = TextStyle(
 
 /// The shareable achievement card. Wrap in RepaintBoundary to export as PNG.
 ///
-/// The card has a fixed layout (no scrolling) and automatically scales down
-/// to fit whatever space the parent gives it.
+/// Full-screen style card (360 x 680, like the shared design). The layout is fixed;
+/// [FittedBox] scales it to whatever size the parent gives it, so give it a tight
+/// width/height to make it fill the screen.
 ///
 /// [channelAvatarUrl] is optional. If it is null or fails to load, the
 /// TubePilot play-logo badge is shown instead.
-/// [channelHandle] is the user's real YouTube handle (e.g. `@mychannel`).
-/// [greeting] / [tagline] are the festival texts at the bottom
-/// (change them for every new occasion).
+/// [greeting] / [tagline] are the festival texts at the bottom (change them for every new
+/// occasion; pass empty strings to hide them).
 class MilestoneCard extends StatelessWidget {
   final String type; // 'subscribers' | 'views'
   final int value;
@@ -70,8 +71,8 @@ class MilestoneCard extends StatelessWidget {
     this.tagline = 'STAY CREATIVE  \u2022  STAY BLESSED',
   });
 
-  static const double _w = 340;
-  static const double _h = 664;
+  static const double cardW = 360;
+  static const double cardH = 680;
 
   String get _handleText {
     final h = (channelHandle ?? '').trim();
@@ -85,18 +86,18 @@ class MilestoneCard extends StatelessWidget {
     final isSubs = type == 'subscribers';
 
     return FittedBox(
-      fit: BoxFit.scaleDown,
+      fit: BoxFit.contain,
       child: SizedBox(
-        width: _w,
-        height: _h,
+        width: cardW,
+        height: cardH,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(30),
           child: DecoratedBox(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF3)],
+                colors: [Color(0xFFFFFFFF), Color(0xFFFFFBF6)],
               ),
             ),
             child: Stack(
@@ -110,21 +111,21 @@ class MilestoneCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 38,
-                        height: 38,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: _C.purple, width: 3.5),
+                          border: Border.all(color: _C.plum, width: 3.4),
                         ),
-                        child: const Icon(Icons.play_arrow_rounded, color: _C.purple, size: 24),
+                        child: const Icon(Icons.play_arrow_rounded, color: _C.plum, size: 22),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       const Text.rich(
                         TextSpan(children: [
                           TextSpan(text: 'Tube', style: TextStyle(color: Color(0xFF1A1A1A))),
-                          TextSpan(text: 'Pilot', style: TextStyle(color: _C.purple)),
+                          TextSpan(text: 'Pilot', style: TextStyle(color: _C.plum)),
                         ]),
-                        style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.1),
+                        style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800, letterSpacing: -0.5, height: 1.1),
                       ),
                       const Text(
                         'Your YouTube Growth Partner',
@@ -136,7 +137,7 @@ class MilestoneCard extends StatelessWidget {
 
                 // ---- Ornate frame + content ----
                 Positioned(
-                  top: 98,
+                  top: 100,
                   left: 10,
                   right: 10,
                   bottom: 10,
@@ -144,7 +145,7 @@ class MilestoneCard extends StatelessWidget {
                     children: [
                       const Positioned.fill(child: CustomPaint(painter: _FramePainter())),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 22, 16, 22),
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -153,28 +154,20 @@ class MilestoneCard extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     const Icon(Icons.eco_rounded, color: _C.gold, size: 20),
                                     const SizedBox(width: 8),
-                                    Flexible(
+                                    Expanded(
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
                                         child: Text(
-                                          'Congratulations!',
-                                          style: _script.copyWith(
-                                            color: _C.purpleDark,
-                                            fontSize: 30,
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          'Congratulations',
+                                          style: TextStyle(color: _C.plum, fontSize: 33, fontWeight: FontWeight.w800, letterSpacing: -0.6),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Transform.flip(
-                                      flipX: true,
-                                      child: const Icon(Icons.eco_rounded, color: _C.gold, size: 20),
-                                    ),
+                                    Transform.flip(flipX: true, child: const Icon(Icons.eco_rounded, color: _C.gold, size: 20)),
                                   ],
                                 ),
                                 const Text(
@@ -196,7 +189,7 @@ class MilestoneCard extends StatelessWidget {
                                       colors: [_C.goldLight, _C.gold, _C.goldDeep, _C.goldLight, _C.gold, _C.goldLight],
                                     ),
                                   ),
-                                  child: _Avatar(url: channelAvatarUrl, name: channelTitle, size: 46),
+                                  child: _Avatar(url: channelAvatarUrl, name: channelTitle, size: 44),
                                 ),
                                 const SizedBox(width: 12),
                                 Flexible(
@@ -225,13 +218,13 @@ class MilestoneCard extends StatelessWidget {
                                             Container(
                                               width: 16,
                                               height: 16,
-                                              decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.purple),
+                                              decoration: const BoxDecoration(shape: BoxShape.circle, color: _C.plum),
                                               child: const Icon(Icons.check_rounded, color: Colors.white, size: 11),
                                             ),
                                           ],
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 3),
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -253,90 +246,89 @@ class MilestoneCard extends StatelessWidget {
                               ],
                             ),
 
-                            // Hero badge: crown + round plaque + laurel wreath + ribbon
+                            // Hero badge: crown (behind) + cream plaque + laurel + ribbon.
+                            // Drawn at 260 x 176 and scaled down a little to fit the card.
                             SizedBox(
                               width: 260,
-                              height: 176,
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  const Positioned.fill(child: CustomPaint(painter: _WreathPainter())),
-                                  Positioned(
-                                    left: 66,
-                                    top: 28,
-                                    child: Container(
-                                      width: 128,
-                                      height: 128,
-                                      padding: const EdgeInsets.fromLTRB(10, 20, 10, 36),
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: _C.gold, width: 3),
-                                        gradient: const RadialGradient(
-                                          center: Alignment(-0.2, -0.4),
-                                          radius: 1.0,
-                                          colors: [Color(0xFF7B2E8E), Color(0xFF4A1860)],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(color: _C.gold.withValues(alpha: 0.35), blurRadius: 16, spreadRadius: 1),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Container(width: 6, height: 1, color: _C.goldLight),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  isSubs ? 'SUBSCRIBERS' : 'VIEWS',
-                                                  style: const TextStyle(
-                                                    color: _C.goldLight,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w700,
-                                                    letterSpacing: 2.2,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Container(width: 6, height: 1, color: _C.goldLight),
-                                              ],
+                              height: 160,
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: SizedBox(
+                                  width: 260,
+                                  height: 176,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      const Positioned.fill(child: CustomPaint(painter: _WreathPainter())),
+                                      const Positioned(top: 0, left: 98, child: _Crown()),
+                                      Positioned(
+                                        left: 64,
+                                        top: 26,
+                                        child: Container(
+                                          width: 132,
+                                          height: 132,
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: const SweepGradient(
+                                              colors: [_C.goldLight, _C.gold, _C.goldDeep, _C.goldLight, _C.gold, _C.goldLight],
                                             ),
+                                            boxShadow: [
+                                              BoxShadow(color: _C.gold.withValues(alpha: 0.30), blurRadius: 14, spreadRadius: 1),
+                                            ],
                                           ),
-                                          Expanded(
-                                            child: Center(
-                                              child: FittedBox(
-                                                fit: BoxFit.scaleDown,
-                                                child: ShaderMask(
-                                                  blendMode: BlendMode.srcIn,
-                                                  shaderCallback: (r) => const LinearGradient(
-                                                    begin: Alignment.topCenter,
-                                                    end: Alignment.bottomCenter,
-                                                    colors: [Color(0xFFFFF3C4), _C.goldLight, _C.gold, _C.goldDeep],
-                                                    stops: [0.0, 0.35, 0.7, 1.0],
-                                                  ).createShader(r),
+                                          child: Container(
+                                            padding: const EdgeInsets.fromLTRB(8, 24, 8, 34),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: _C.goldLight, width: 1.2),
+                                              gradient: const RadialGradient(
+                                                center: Alignment(-0.2, -0.4),
+                                                radius: 1.0,
+                                                colors: [Color(0xFFFFFFFF), Color(0xFFF3E6C8)],
+                                              ),
+                                            ),
+                                            child: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                FittedBox(
+                                                  fit: BoxFit.scaleDown,
                                                   child: Text(
-                                                    v,
+                                                    isSubs ? 'SUBSCRIBERS' : 'VIEWS',
                                                     style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 46,
-                                                      fontWeight: FontWeight.w900,
-                                                      letterSpacing: -1,
-                                                      height: 1.0,
+                                                      color: Color(0xFF222222),
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w500,
+                                                      letterSpacing: 0.8,
                                                     ),
                                                   ),
                                                 ),
-                                              ),
+                                                Expanded(
+                                                  child: Center(
+                                                    child: FittedBox(
+                                                      fit: BoxFit.scaleDown,
+                                                      child: Text(
+                                                        v,
+                                                        style: const TextStyle(
+                                                          color: Color(0xFF0E0E0E),
+                                                          fontSize: 52,
+                                                          fontWeight: FontWeight.w900,
+                                                          letterSpacing: -1,
+                                                          height: 1.0,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
+                                      const Positioned(top: 118, left: 28, child: _Ribbon()),
+                                    ],
                                   ),
-                                  const Positioned(top: 4, left: 110, child: _Crown()),
-                                  const Positioned(top: 118, left: 28, child: _Ribbon()),
-                                ],
+                                ),
                               ),
                             ),
 
@@ -356,7 +348,7 @@ class MilestoneCard extends StatelessWidget {
                                   style: TextStyle(color: _C.purpleDark, fontSize: 11, height: 1.35, fontWeight: FontWeight.w400),
                                 ),
                                 if (!isSubs && (videoTitle ?? '').isNotEmpty) ...[
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 3),
                                   Text(
                                     videoTitle!,
                                     maxLines: 1,
@@ -372,12 +364,12 @@ class MilestoneCard extends StatelessWidget {
                             Row(
                               children: [
                                 const SizedBox(width: 24),
-                                Expanded(child: Container(height: 1, color: _C.purple.withValues(alpha: 0.45))),
+                                Expanded(child: Container(height: 1, color: _C.plum.withValues(alpha: 0.45))),
                                 const Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Icon(Icons.local_florist_rounded, color: _C.purple, size: 20),
+                                  child: Icon(Icons.local_florist_rounded, color: _C.plum, size: 18),
                                 ),
-                                Expanded(child: Container(height: 1, color: _C.purple.withValues(alpha: 0.45))),
+                                Expanded(child: Container(height: 1, color: _C.plum.withValues(alpha: 0.45))),
                                 const SizedBox(width: 24),
                               ],
                             ),
@@ -401,10 +393,10 @@ class MilestoneCard extends StatelessWidget {
                             // Brand pill
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(999),
-                                gradient: const LinearGradient(colors: [_C.purpleDark, _C.purpleDeep, _C.purple]),
+                                gradient: const LinearGradient(colors: [_C.purpleDark, _C.plum, _C.purple]),
                                 boxShadow: [
                                   BoxShadow(color: _C.purpleDark.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4)),
                                 ],
@@ -434,10 +426,7 @@ class MilestoneCard extends StatelessWidget {
                                       margin: const EdgeInsets.symmetric(horizontal: 12),
                                       color: _C.goldLight.withValues(alpha: 0.7),
                                     ),
-                                    Text(
-                                      'Together We Grow',
-                                      style: _script.copyWith(color: _C.goldLight, fontSize: 13.5),
-                                    ),
+                                    Text('Together We Grow', style: _script.copyWith(color: _C.goldLight, fontSize: 13.5)),
                                     const SizedBox(width: 4),
                                     const Icon(Icons.eco_rounded, color: _C.goldLight, size: 13),
                                   ],
@@ -445,57 +434,51 @@ class MilestoneCard extends StatelessWidget {
                               ),
                             ),
 
-                            // Greeting
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.eco_rounded, color: _C.gold, size: 14),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          greeting,
-                                          style: _script.copyWith(color: _C.goldDeep, fontSize: 25, fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Transform.flip(
-                                      flipX: true,
-                                      child: const Icon(Icons.eco_rounded, color: _C.gold, size: 14),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(width: 22, height: 1, color: _C.gold.withValues(alpha: 0.7)),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        child: Text(
-                                          tagline,
-                                          style: const TextStyle(
-                                            color: _C.purpleDark,
-                                            fontSize: 8.5,
-                                            letterSpacing: 1.3,
-                                            fontWeight: FontWeight.w500,
+                            // Festival text (empty strings = hidden).
+                            if (greeting.isNotEmpty || tagline.isNotEmpty)
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (greeting.isNotEmpty)
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.eco_rounded, color: _C.gold, size: 14),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            child: Text(greeting, style: _script.copyWith(color: _C.goldDeep, fontSize: 26, fontWeight: FontWeight.w500)),
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
+                                        Transform.flip(flipX: true, child: const Icon(Icons.eco_rounded, color: _C.gold, size: 14)),
+                                      ],
+                                    ),
+                                  if (tagline.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 3),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Container(width: 22, height: 1, color: _C.gold.withValues(alpha: 0.7)),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            child: FittedBox(
+                                              fit: BoxFit.scaleDown,
+                                              child: Text(
+                                                tagline,
+                                                style: const TextStyle(color: _C.purpleDark, fontSize: 8.5, letterSpacing: 1.3, fontWeight: FontWeight.w500),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(width: 22, height: 1, color: _C.gold.withValues(alpha: 0.7)),
+                                        ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(width: 22, height: 1, color: _C.gold.withValues(alpha: 0.7)),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                           ],
                         ),
                       ),
@@ -512,7 +495,7 @@ class MilestoneCard extends StatelessWidget {
 
   static Widget _vDivider() => Container(
         width: 1,
-        height: 44,
+        height: 40,
         color: _C.gold.withValues(alpha: 0.35),
       );
 }
@@ -532,16 +515,16 @@ class _Feature extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withValues(alpha: 0.7),
               border: Border.all(color: _C.gold.withValues(alpha: 0.5)),
             ),
-            child: Icon(icon, size: 17, color: _C.purpleDeep),
+            child: Icon(icon, size: 16, color: _C.purpleDeep),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 3),
           Text(
             label,
             textAlign: TextAlign.center,
@@ -575,7 +558,7 @@ class _Crown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(width: 40, height: 24, child: CustomPaint(painter: _CrownPainter()));
+    return const SizedBox(width: 64, height: 38, child: CustomPaint(painter: _CrownPainter()));
   }
 }
 

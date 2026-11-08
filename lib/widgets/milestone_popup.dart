@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -7,7 +8,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/api_service.dart';
-import '../theme/app_theme.dart';
+import 'app_decor.dart';
 import 'common.dart';
 import 'milestone_card.dart';
 
@@ -33,7 +34,7 @@ class MilestonePopup {
       );
       return true;
     } catch (_) {
-      // Popup is a bonus feature — never break the home page because of it.
+      // Popup is a bonus feature - never break the home page because of it.
       return false;
     } finally {
       _busy = false;
@@ -53,15 +54,13 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
   bool _working = false;
 
   String? _avatarUrl;
-  String? _handle; // UPDATE25: real YouTube @handle
+  String? _handle; // real YouTube @handle
 
   @override
   void initState() {
     super.initState();
     // Mark as seen the moment it is shown, so the same milestone never pops up twice.
-    ApiService.instance
-        .markMilestoneSeen('${widget.data['id']}')
-        .catchError((_) => <String, dynamic>{});
+    ApiService.instance.markMilestoneSeen('${widget.data['id']}').catchError((_) => <String, dynamic>{});
     _avatarUrl = _pickAvatar(widget.data);
     _handle = _pickHandle(widget.data);
     // Milestone data has no photo / handle -> take them from the connected YouTube channel.
@@ -103,9 +102,7 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
       final v = m[k];
       if (v is String && v.startsWith('http')) return v;
       // thumbnails sometimes come as {url: ...}
-      if (v is Map &&
-          v['url'] is String &&
-          (v['url'] as String).startsWith('http')) {
+      if (v is Map && v['url'] is String && (v['url'] as String).startsWith('http')) {
         return v['url'] as String;
       }
     }
@@ -133,8 +130,7 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
   /// The card on screen is scaled to fit the phone, so the capture pixel ratio is
   /// chosen to always give a sharp ~1080px wide image, whatever the screen size.
   Future<Uint8List> _capturePng() async {
-    final boundary =
-        _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final boundary = _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
     final w = boundary.size.width;
     final pixelRatio = w > 0 ? (1080 / w).clamp(1.0, 8.0) : 3.0;
     final image = await boundary.toImage(pixelRatio: pixelRatio);
@@ -148,9 +144,7 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
     try {
       final png = await _capturePng();
       if (!await Gal.hasAccess()) await Gal.requestAccess();
-      await Gal.putImageBytes(png,
-          album: 'TubePilot',
-          name: 'tubepilot_milestone_${widget.data['value']}');
+      await Gal.putImageBytes(png, album: 'TubePilot', name: 'tubepilot_milestone_${widget.data['value']}');
       if (mounted) showToast(context, 'Saved to your gallery', isSuccess: true);
     } catch (e) {
       if (mounted) showToast(context, 'Could not save image', isError: true);
@@ -165,13 +159,12 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
     try {
       final png = await _capturePng();
       final dir = await getTemporaryDirectory();
-      final file =
-          File('${dir.path}/tubepilot_milestone_${widget.data['value']}.png');
+      final file = File('${dir.path}/tubepilot_milestone_${widget.data['value']}.png');
       await file.writeAsBytes(png);
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path)],
-          text: 'Milestone unlocked with TubePilot 🚀',
+          text: 'Milestone unlocked with TubePilot \u{1F680}',
         ),
       );
     } catch (e) {
@@ -181,78 +174,93 @@ class _MilestoneDialogState extends State<_MilestoneDialog> {
     }
   }
 
+  ButtonStyle get _btnStyle => ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: UiColors.plum,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      );
+
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
-    // Fixed layout (no scrolling): close button on top, buttons at the bottom,
-    // and the card in the middle scales itself to whatever space is left.
+    final mq = MediaQuery.of(context);
+    // The card fills the screen: full width (small side margin) and as tall as the space
+    // between the close button and the buttons allows. The bottom bar is hidden while this
+    // popup is open (PopupNavObserver), so the whole height is available.
+    const sideMargin = 8.0;
+    const closeRow = 44.0;
+    const buttonsRow = 74.0;
+    final maxW = math.min(mq.size.width - sideMargin * 2, 480.0);
+    final maxH = mq.size.height - mq.padding.top - mq.padding.bottom - closeRow - buttonsRow - 24;
+    final scale = math.min(maxW / MilestoneCard.cardW, maxH / MilestoneCard.cardH);
+    final cardW = MilestoneCard.cardW * scale;
+    final cardH = MilestoneCard.cardH * scale;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: IconButton(
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.close_rounded, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+      insetPadding: const EdgeInsets.symmetric(horizontal: sideMargin, vertical: 0),
+      child: SafeArea(
+        child: SizedBox(
+          width: cardW,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Close button: inside the safe area (never under the status bar).
+              SizedBox(
+                height: closeRow,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
               ),
-            ),
-            // Only this part is exported as the PNG (no buttons in the image).
-            Flexible(
-              child: RepaintBoundary(
+              // Only this part is exported as the PNG (no buttons in the image).
+              RepaintBoundary(
                 key: _cardKey,
-                child: MilestoneCard(
-                  type: '${d['type']}',
-                  value: (d['value'] as num).toInt(),
-                  channelTitle: '${d['channelTitle'] ?? ''}',
-                  channelHandle:
-                      _handle, // real handle, null -> card shows "YouTube Channel"
-                  videoTitle: d['videoTitle'] as String?,
-                  channelAvatarUrl: _avatarUrl,
+                child: SizedBox(
+                  width: cardW,
+                  height: cardH,
+                  child: MilestoneCard(
+                    type: '${d['type']}',
+                    value: (d['value'] as num).toInt(),
+                    channelTitle: '${d['channelTitle'] ?? ''}',
+                    channelHandle: _handle, // real handle, null -> card shows "YouTube Channel"
+                    videoTitle: d['videoTitle'] as String?,
+                    channelAvatarUrl: _avatarUrl,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _working ? null : _download,
-                    icon: const Icon(Icons.download_rounded, size: 20),
-                    label: const Text('Download'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.diamond,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _working ? null : _download,
+                      icon: const Icon(Icons.download_rounded, size: 22),
+                      label: const Text('Download'),
+                      style: _btnStyle,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _working ? null : _share,
-                    icon: const Icon(Icons.share_rounded, size: 20),
-                    label: const Text('Share'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.purpleLight,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _working ? null : _share,
+                      icon: const Icon(Icons.share_rounded, size: 22),
+                      label: const Text('Share'),
+                      style: _btnStyle,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
         ),
       ),
     );

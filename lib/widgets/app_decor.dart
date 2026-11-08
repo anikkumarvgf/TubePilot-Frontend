@@ -7,20 +7,20 @@ class UiColors {
   static const bg = Color(0xFFFDFCFE);
   static const cardTop = Color(0xFFFFFFFF);
   static const cardBottom = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFE4DFEC);
-  static const iconCircle = Color(0xFFF1ECF8);
+  static const cardBorder = Color(0xFFE6DDE8);
+  static const iconCircle = Color(0xFFF3ECF4);
 
   // Brand purples (dashboard / popups)
-  static const purpleDark = Color(0xFF3F1A7A);
-  static const purple = Color(0xFF6B2C9C);
-  static const purpleDeep = Color(0xFF3F1A7A);
+  static const purpleDark = Color(0xFF4A1A52); // dark plum
+  static const purple = Color(0xFF7A2C8C);
+  static const purpleDeep = Color(0xFF4A1A52);
   static const mauve = Color(0xFF8E7BA6);
   static const textDim = Color(0xFF6E6A78);
   static const inkBlack = Color(0xFF1B0F20);
 
   // Login / Sign-up artwork (plum header + teal leaves)
   static const plum = Color(0xFF52235E);
-  static const authSheet = Color(0xFFF6EFF6);
+  static const authSheet = Color(0xFFF5EEF6);
   static const leaf = Color(0xFF52B3A0);
   static const leafDark = Color(0xFF4A9F8E);
   static const leafVein = Color(0xFF1F7A78);
@@ -181,117 +181,51 @@ class AppBottomNav extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Login / Sign-up artwork from the UI design: plum header with teal leaves,
-// and a light rounded sheet that overlaps it.
+// Login / Sign-up layout (UI design): the page behind is off-white (the screen puts the
+// faint play-icon pattern behind this widget), a big plum header text on top, and a
+// lavender sheet with rounded top corners from [headerHeight] down to the bottom.
+// [headerHeight] includes the status bar.
 // ---------------------------------------------------------------------------
 class AuthHeaderBackground extends StatelessWidget {
   final Widget header;
   final Widget sheet;
   final double headerHeight;
-  final bool showPlant;
 
   const AuthHeaderBackground({
     super.key,
     required this.header,
     required this.sheet,
-    this.headerHeight = 250,
-    this.showPlant = true,
+    this.headerHeight = 200,
   });
 
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.paddingOf(context).top;
-    return ColoredBox(
-      color: UiColors.plum,
-      child: Stack(
-        children: [
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: headerHeight + 40,
-            child: CustomPaint(painter: _LeavesPainter(showPlant: showPlant, topInset: topInset)),
+    return Column(
+      children: [
+        SizedBox(
+          height: headerHeight,
+          width: double.infinity,
+          child: Align(
+            alignment: Alignment.bottomLeft,
+            child: Padding(padding: const EdgeInsets.fromLTRB(30, 0, 24, 26), child: header),
           ),
-          Positioned.fill(
-            child: Column(
-            children: [
-              SizedBox(
-                height: headerHeight + topInset,
-                width: double.infinity,
-                child: Align(
-                  alignment: Alignment.bottomLeft,
-                  child: Padding(padding: const EdgeInsets.fromLTRB(30, 0, 24, 34), child: header),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: UiColors.authSheet,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-                    child: sheet,
-                  ),
-                ),
-              ),
-            ],
+        ),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: UiColors.authSheet,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
+              child: sheet,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
-}
-
-class _LeavesPainter extends CustomPainter {
-  final bool showPlant;
-  final double topInset;
-  const _LeavesPainter({required this.showPlant, required this.topInset});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final leaf = Paint()..color = UiColors.leaf;
-    final vein = Paint()
-      ..color = UiColors.leafVein
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-
-    // Big leaf, top-left corner.
-    final big = Path()
-      ..moveTo(-10, -6)
-      ..cubicTo(40, -10, 100, 30, 112, 100)
-      ..cubicTo(150, 105, 140, 150, 98, 148)
-      ..cubicTo(40, 150, -10, 110, -10, 60)
-      ..close();
-    canvas.drawPath(big, leaf);
-    final v = Path()
-      ..moveTo(12, 0)
-      ..quadraticBezierTo(50, 30, 52, 82);
-    canvas.drawPath(v, vein);
-
-    if (showPlant) {
-      // Tall plant on the right.
-      final w = size.width;
-      final l1 = Path()
-        ..moveTo(w - 70, 200)
-        ..cubicTo(w - 112, 140, w - 108, 100, w - 92, 80)
-        ..cubicTo(w - 70, 110, w - 56, 160, w - 54, 200)
-        ..close();
-      canvas.drawPath(l1, Paint()..color = UiColors.leaf);
-      final l2 = Path()
-        ..moveTo(w - 62, 200)
-        ..cubicTo(w - 60, 130, w - 44, 80, w - 30, 40)
-        ..cubicTo(w - 14, 90, w - 20, 160, w - 40, 200)
-        ..close();
-      canvas.drawPath(l2, Paint()..color = UiColors.leafDark);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LeavesPainter old) => old.showPlant != showPlant || old.topInset != topInset;
 }
 
 // Plum pill button used on Login / Sign Up.
