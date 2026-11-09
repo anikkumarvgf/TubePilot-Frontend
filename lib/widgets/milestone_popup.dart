@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/api_service.dart';
 import 'app_decor.dart';
@@ -26,6 +27,18 @@ class MilestonePopup {
       final res = await ApiService.instance.getPendingMilestone();
       final m = res['milestone'];
       if (m == null || !context.mounted) return false;
+
+      // The backend keeps a card "active" for 15 days. Here it is limited to ONCE PER DAY
+      // (local date). The day is saved BEFORE showing, so a closed app does not repeat it today.
+      final id = '${m['id']}';
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'milestone_last_shown_day_$id';
+      if (prefs.getString(key) == today) return false;
+      await prefs.setString(key, today);
+      if (!context.mounted) return false;
+
       await showDialog(
         context: context,
         barrierDismissible: false,

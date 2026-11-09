@@ -77,6 +77,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/videos/offer.mp4
     - assets/onboarding_ai.png
     - assets/diwali_bg.png
     - assets/companylogo.png

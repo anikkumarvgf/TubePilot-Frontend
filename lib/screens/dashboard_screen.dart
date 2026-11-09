@@ -36,6 +36,7 @@ import 'competitor_radar_screen.dart';
 import 'live_stream_screen.dart';
 // Starts loading the Rs1 offer video early (fast popup)
 import '../widgets/offer_video.dart';
+import '../widgets/referral_dialog.dart';
 import '../services/subscription_pay.dart';
 
 const String kIdeasPopupLastShownKey = 'ideas_popup_last_shown_ms';
@@ -312,8 +313,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     if (prefs.getBool(key) == true) return;
     await prefs.setBool(key, true);
     if (!mounted) return;
-    // TODO(referral): the referral popup was not in the files received so far. Put its call here,
-    // e.g.  await showReferralPopup(context);
+    await showReferralDialog(context);
   }
 
   /// true = payment is done (or not needed / not possible) -> go to the next step.

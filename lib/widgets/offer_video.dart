@@ -22,8 +22,8 @@ class OfferVideo {
     final c = VideoPlayerController.asset(asset, videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
     _ctrl = c;
     _init = c.initialize().then((_) {
-      c.setLooping(true);
-      c.setVolume(0); // autoplay is always muted (like a story ad)
+      c.setLooping(false); // the presenter speaks once; tap the video to replay
+      c.setVolume(1);
     }).catchError((Object e) {
       debugPrint('[OfferVideo] could not load $asset: $e');
       _failed = true;
@@ -51,7 +51,8 @@ class OfferVideoBox extends StatefulWidget {
 
 class _OfferVideoBoxState extends State<OfferVideoBox> {
   bool _ready = false;
-  bool _muted = true;
+  bool _muted = false;
+  bool _ended = false;
 
   @override
   void initState() {
@@ -61,9 +62,31 @@ class _OfferVideoBoxState extends State<OfferVideoBox> {
     f?.then((_) {
       final c = OfferVideo._ctrl;
       if (!mounted || c == null || !c.value.isInitialized) return;
+      c.addListener(_onTick);
       c.play();
       setState(() => _ready = true);
     });
+  }
+
+  void _onTick() {
+    final c = OfferVideo._ctrl;
+    if (c == null || !mounted) return;
+    final v = c.value;
+    final done = v.isInitialized && !v.isPlaying && v.duration > Duration.zero && v.position >= v.duration;
+    if (done != _ended) setState(() => _ended = done);
+  }
+
+  void _replay() {
+    final c = OfferVideo._ctrl;
+    if (c == null) return;
+    c.seekTo(Duration.zero);
+    c.play();
+  }
+
+  @override
+  void dispose() {
+    OfferVideo._ctrl?.removeListener(_onTick);
+    super.dispose();
   }
 
   void _toggleMute() {
@@ -109,6 +132,22 @@ class _OfferVideoBoxState extends State<OfferVideoBox> {
                     width: c.value.size.width,
                     height: c.value.size.height,
                     child: VideoPlayer(c),
+                  ),
+                ),
+              if (_ready && _ended)
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: _replay,
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                        child: const Icon(Icons.replay_rounded, color: UiColors.purpleDark, size: 28),
+                      ),
+                    ),
                   ),
                 ),
               if (_ready)
