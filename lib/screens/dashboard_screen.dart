@@ -199,8 +199,28 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
   }
 
   // Locked <-> unlocked (user paid): rebuild so the "Uploads" tile changes.
+  bool _wasLocked = PaymentGate.instance.locked;
+
   void _onGate() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final nowLocked = PaymentGate.instance.locked;
+    final justPaid = _wasLocked && !nowLocked;
+    _wasLocked = nowLocked;
+    setState(() {});
+    if (justPaid) _afterLaterPayment();
+  }
+
+  /// The user said "Maybe later" before and has just paid (from the locked Uploads tile, Upload tab,
+  /// Live Stream ...): reload the dashboard and run Referral -> Connect channel -> Welcome now.
+  /// (While the normal flow is running it handles the payment itself, so this does nothing then.)
+  Future<void> _afterLaterPayment() async {
+    await Future.delayed(const Duration(milliseconds: 700));
+    if (!mounted || _flowBusy) return;
+    final owner = _ownerKey();
+    await setOnboardingStage(owner, OnboardingStage.referral); // referral (once) is shown for the first time now
+    _load(showLoader: false); // dashboard shows the new uploads right away
+    if (!mounted) return;
+    await _runOnboardingFlow();
   }
 
   @override
@@ -284,8 +304,8 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       if (stage == null || stage == OnboardingStage.payment) {
         final paid = await _stagePayment();
         if (!paid) {
-          // "Maybe later": new signup sees the referral popup once, then the (locked) dashboard.
-          if (stage == OnboardingStage.payment && mounted) await _stageReferralOnce(owner);
+          // "Maybe later": NO referral popup now - straight to the (locked) dashboard. Referral comes
+          // only after he pays.
           return true; // Rs1 popup comes again next time
         }
         if (stage == null) return false; // old account: continue with the normal popups

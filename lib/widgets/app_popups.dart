@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'brand_icons.dart';
@@ -222,8 +223,29 @@ Future<void> showWelcomePopup(BuildContext context) {
   );
 }
 
-class _WelcomeDialog extends StatelessWidget {
+class _WelcomeDialog extends StatefulWidget {
   const _WelcomeDialog();
+  @override
+  State<_WelcomeDialog> createState() => _WelcomeDialogState();
+}
+
+class _WelcomeDialogState extends State<_WelcomeDialog> {
+  Timer? _auto;
+
+  @override
+  void initState() {
+    super.initState();
+    // stays on screen for 4 seconds, then closes by itself (X / Let's Go close it earlier)
+    _auto = Timer(const Duration(seconds: 4), () {
+      if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _auto?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -237,18 +259,19 @@ class _WelcomeDialog extends StatelessWidget {
 
     return AppPopupShell(
       onClose: () => Navigator.of(context).pop(),
-      padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+      maxWidth: 460, // wider welcome card
+      padding: const EdgeInsets.fromLTRB(26, 30, 26, 26),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset('assets/splash.png', width: 34, height: 34),
+              Image.asset('assets/splash.png', width: 38, height: 38),
               const SizedBox(width: 6),
               RichText(
                 text: const TextSpan(
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: -0.5),
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 27, letterSpacing: -0.5),
                   children: [
                     TextSpan(text: 'Tube', style: TextStyle(color: UiColors.inkBlack)),
                     TextSpan(text: 'Pilot', style: TextStyle(color: UiColors.plum)),
@@ -259,28 +282,28 @@ class _WelcomeDialog extends StatelessWidget {
           ),
           const Text(
             'Your YouTube Growth Partner',
-            style: TextStyle(color: UiColors.textDim, fontSize: 11, fontWeight: FontWeight.w500),
+            style: TextStyle(color: UiColors.textDim, fontSize: 12.5, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 18),
           const Text(
             'Welcome to',
-            style: TextStyle(color: UiColors.purple, fontSize: 18, fontWeight: FontWeight.w600),
+            style: TextStyle(color: UiColors.purple, fontSize: 20, fontWeight: FontWeight.w600),
           ),
           const Text(
             'TubePilot',
-            style: TextStyle(color: UiColors.purpleDark, fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: -0.8, height: 1.1),
+            style: TextStyle(color: UiColors.purpleDark, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -0.8, height: 1.1),
           ),
           const SizedBox(height: 8),
           const Text(
             'Congratulations on joining TubePilot!',
             textAlign: TextAlign.center,
-            style: TextStyle(color: UiColors.purpleDark, fontSize: 14.5, fontWeight: FontWeight.w800),
+            style: TextStyle(color: UiColors.purpleDark, fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 3),
           const Text(
             "Let's make your YouTube journey bigger.",
             textAlign: TextAlign.center,
-            style: TextStyle(color: UiColors.textDim, fontSize: 12.5, height: 1.3),
+            style: TextStyle(color: UiColors.textDim, fontSize: 14, height: 1.3),
           ),
           const SizedBox(height: 16),
           Container(
