@@ -8,6 +8,7 @@ import '../widgets/common.dart';
 import '../widgets/custom_dropdown.dart';
 import '../widgets/app_brand_background.dart';
 import '../widgets/app_decor.dart';
+import '../services/payment_gate.dart';
 import 'dashboard_screen.dart';
 
 class UsernameSetupScreen extends StatefulWidget {
@@ -119,9 +120,12 @@ class _UsernameSetupScreenState extends State<UsernameSetupScreen> {
     try {
       await context.read<AuthProvider>().setupUsername(username: username, language: _language);
       if (!mounted) return;
+      // Rs1 screen opens FIRST, before the dashboard is ever visible.
+      await PaymentGate.instance.showOfferAtSignup(context);
+      if (!mounted) return;
       // Rs1 -> Referral -> Connect -> Welcome: ALL of these now come from the Dashboard
       // (the referral popup used to open here, i.e. BEFORE the Rs1 popup).
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen(freshSignup: true)));
     } catch (e) {
       if (mounted) showApiError(context, e);
     } finally {

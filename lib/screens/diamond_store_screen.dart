@@ -41,10 +41,7 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
   @override
   void initState() {
     super.initState();
-    _load().then((_) {
-      if (!mounted || !widget.autoStartSubscription) return;
-      if (_subStatus?['eligible'] == true) _subscribe();
-    });
+    _load(); // Rs1 offer lives on its own full-screen page now (no card / auto-start here)
   }
 
   Future<void> _loadSubscription() async {
@@ -109,8 +106,7 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
     final offer = st['offer'] is Map ? Map<String, dynamic>.from(st['offer']) : <String, dynamic>{};
     final sub = st['subscription'] is Map ? Map<String, dynamic>.from(st['subscription']) : null;
     final plan = offer['planAmount'] ?? 10;
-    final intro = offer['introAmount'] ?? 1;
-    final uploads = offer['uploads'] ?? 20;
+    final uploads = offer['planUploads'] ?? offer['uploads'] ?? 30;
     final left = (st['uploadsLeft'] as num?)?.toInt() ?? 0;
     final status = (sub?['status'] ?? '').toString();
 
@@ -163,28 +159,6 @@ class _DiamondStoreScreenState extends State<DiamondStoreScreen> {
       ]);
     }
 
-    if (st['eligible'] == true) {
-      return shell(border: AppColors.purple, children: [
-        Text('Start for just ₹$intro', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        const SizedBox(height: 6),
-        Text(
-          'Pay ₹$intro now and get $uploads video uploads. When they finish, ₹$plan is auto-debited '
-          'for the next $uploads uploads, and your 1-month period starts that day. '
-          'We notify you before each debit. Cancel anytime here.',
-          style: TextStyle(color: context.surfaces.textDim, fontSize: 12.5, height: 1.4),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: (_subBusy || _payingDiamonds != null) ? null : _subscribe,
-            child: _subBusy
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text('Pay ₹$intro & start'),
-          ),
-        ),
-      ]);
-    }
     return const SizedBox.shrink();
   }
 

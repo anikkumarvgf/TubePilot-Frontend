@@ -38,6 +38,7 @@ import 'live_stream_screen.dart';
 import '../widgets/offer_video.dart';
 import '../widgets/referral_dialog.dart';
 import '../services/subscription_pay.dart';
+import '../widgets/payu_checkout.dart';
 
 const String kIdeasPopupLastShownKey = 'ideas_popup_last_shown_ms';
 
@@ -47,8 +48,15 @@ const double _kScreenPadding = 16;
 /// Gap between card rows.
 const double _kRowGap = 14;
 
+/// "Cover" shown over the dashboard right after sign-up until the onboarding popups are done.
+class DashboardCover {
+  static final ValueNotifier<bool> notifier = ValueNotifier<bool>(false);
+}
+
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  /// true right after sign-up: a plain cover is shown until Referral -> Connect -> Welcome are done.
+  final bool freshSignup;
+  const DashboardScreen({super.key, this.freshSignup = false});
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
@@ -65,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     AppNav.instance.addListener(_onNav);
     AppNav.instance.setDashboardMounted(true);
+    DashboardCover.notifier.value = widget.freshSignup;
   }
 
   @override
@@ -114,7 +123,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           extendBody: false,
-          body: IndexedStack(index: AppNav.instance.tab, children: screens),
+          body: Stack(
+            children: [
+              IndexedStack(index: AppNav.instance.tab, children: screens),
+              // Right after sign-up: plain cover while Referral -> Connect -> Welcome popups run
+              // on top (the dashboard stays mounted underneath, it runs that flow).
+              ValueListenableBuilder<bool>(
+                valueListenable: DashboardCover.notifier,
+                builder: (_, on, __) => on
+                    ? const Positioned.fill(child: ColoredBox(color: Color(0xFFFAF8FF)))
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
           // No bottomNavigationBar here: the bar is drawn once in main.dart
           // (MaterialApp.builder), so it also shows on pushed screens.
         ),
@@ -157,7 +178,10 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
 
       // NEW USER FLOW (strict order): Rs1 payment -> referral -> connect channel -> welcome.
       // While this flow is active, no other popup is shown on top of it.
+      await PayuTrace.showIfInterrupted(context);
+      if (!mounted) return;
       final inFlow = await _runOnboardingFlow();
+      DashboardCover.notifier.value = false;
       if (!mounted || inFlow) return;
 
       // Milestone popup has priority. If a milestone card was shown, skip
@@ -302,6 +326,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
       return true;
     } finally {
       _flowBusy = false;
+      DashboardCover.notifier.value = false; // popups finished -> show the dashboard
     }
   }
 
@@ -327,6 +352,12 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     debugPrint('[Onboarding] subscription status -> locked=${st['locked']} eligible=${st['eligible']} offer=${st['offer']}');
     // Not locked = already paid (Rs1 / diamond pack), or payments unavailable (backend: PayU keys missing).
     if (!PaymentGate.isLockedStatus(st)) return true;
+
+    if (PaymentGate.instance.offerShownAtSignup) {
+      // The Rs1 screen was just shown after sign-up; do not repeat it now (it comes next app open).
+      PaymentGate.instance.offerShownAtSignup = false;
+      return false;
+    }
 
     final offer = st['offer'] is Map ? Map<String, dynamic>.from(st['offer']) : <String, dynamic>{};
     final intro = offer['introAmount'] as num?;
@@ -781,6 +812,33 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
                       ),
                     ],
                   ),
+                  // Rs10 month: "Plan ends in X days" (real date from the server)
+                  if (PaymentGate.instance.planDaysLeft != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: UiColors.iconCircle,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.schedule_rounded, size: 16, color: UiColors.purpleDeep),
+                              const SizedBox(width: 6),
+                              Text(
+                                PaymentGate.instance.planDaysLeft == 1
+                                    ? 'Your plan ends in 1 day'
+                                    : 'Your plan ends in ${PaymentGate.instance.planDaysLeft} days',
+                                style: const TextStyle(color: UiColors.purpleDeep, fontSize: 12.5, fontWeight: FontWeight.w700),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
 
                   // ---- Quick Actions ----

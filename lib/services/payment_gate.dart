@@ -21,6 +21,19 @@ class PaymentGate extends ChangeNotifier {
 
   bool _locked = false;
   Map<String, dynamic>? _offer;
+  DateTime? _planExpiresAt;
+
+  /// When the current one-time Rs10 month ends (null = no active month).
+  DateTime? get planExpiresAt => _planExpiresAt;
+
+  /// Whole days left of the Rs10 month (rounded up), null = none / already over.
+  int? get planDaysLeft {
+    final e = _planExpiresAt;
+    if (e == null) return null;
+    final left = e.difference(DateTime.now());
+    if (left.isNegative) return null;
+    return (left.inHours / 24).ceil().clamp(1, 9999);
+  }
 
   /// true = user has not paid yet (features locked). Starts false until the first status call
   /// answers; the backend blocks locked users anyway.
@@ -42,13 +55,49 @@ class PaymentGate extends ChangeNotifier {
       final st = Map<String, dynamic>.from(await ApiService.instance.getSubscriptionStatus());
       if (st['offer'] is Map) _offer = Map<String, dynamic>.from(st['offer']);
       final l = isLockedStatus(st);
-      if (l != _locked) {
+      final exp = st['planExpiresAt'] == null ? null : DateTime.tryParse(st['planExpiresAt'].toString())?.toLocal();
+      if (l != _locked || exp != _planExpiresAt) {
         _locked = l;
+        _planExpiresAt = exp;
         notifyListeners();
       }
       return st;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Set when the Rs1 screen was already shown right after sign-up, so the dashboard does not show
+  /// it a second time in the same moment.
+  bool offerShownAtSignup = false;
+
+  /// Called right after sign-up (before the dashboard is ever visible). Shows the full-screen Rs1
+  /// page; "Pay" opens PayU directly. Never throws.
+  Future<void> showOfferAtSignup(BuildContext context) async {
+    try {
+      final st = await fetchStatus();
+      if (st == null || !_locked || !context.mounted) return;
+      final o = _offer ?? const <String, dynamic>{};
+      final intro = o['introAmount'] as num?;
+      final plan = o['planAmount'] as num?;
+      final uploads = (o['introUploads'] ?? o['uploads']) as num?;
+      final planUploads = (o['planUploads'] ?? o['uploads']) as num?;
+      if (intro == null || plan == null || uploads == null) return;
+      offerShownAtSignup = true;
+      final start = await showSubscriptionOfferPopup(
+        context,
+        intro: intro,
+        plan: plan,
+        uploads: uploads.toInt(),
+        planUploads: planUploads?.toInt(),
+        barrierDismissible: false,
+      );
+      if (start && context.mounted) {
+        await startSubscriptionPayment(context);
+        await fetchStatus();
+      }
+    } catch (e) {
+      debugPrint('[PaymentGate] signup offer failed: $e');
     }
   }
 

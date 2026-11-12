@@ -32,7 +32,7 @@ Future<bool> startSubscriptionPayment(BuildContext context) async {
   if (!context.mounted) return r.approved;
 
   if (r.approved) {
-    showToast(context, 'Subscription started. Uploads unlocked!', isSuccess: true);
+    showToast(context, 'Payment successful. Uploads added!', isSuccess: true);
   } else if (r.status == 'pending') {
     showToast(context, r.message);
   } else if (r.status != 'cancelled') {

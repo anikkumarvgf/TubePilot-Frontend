@@ -140,6 +140,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _loadInitialData() async {
     try {
+      PaymentGate.instance.refresh(); // paid or not (the listener rebuilds the screen)
       final results = await Future.wait([
         ApiService.instance.dashboard(),
         ApiService.instance
@@ -151,7 +152,6 @@ class _UploadScreenState extends State<UploadScreen> {
         ApiService.instance
             .getAutoSlotting()
             .catchError((_) => <String, dynamic>{}),
-        PaymentGate.instance.refresh(), // paid or not
       ]);
       final dash = results[0];
       final yt = results[1];

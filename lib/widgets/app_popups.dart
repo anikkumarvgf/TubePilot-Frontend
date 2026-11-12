@@ -584,7 +584,7 @@ class AppSheetTile extends StatelessWidget {
 
 
 // =============================================================================
-// Rs1 payment popup: Rs1 now = 20 uploads, then Rs10 autopay when they finish
+// Rs1 payment popup: Rs1 once = 20 uploads (no autopay). [monthly] = the one-time Rs10 month popup.
 // =============================================================================
 const String kSubscriptionPopupLastShownKey = 'subscription_popup_last_shown_ms';
 
@@ -596,6 +596,8 @@ Future<bool> showSubscriptionOfferPopup(
   required int uploads,
   int? planUploads, // uploads that come with the Rs10 plan (backend `planUploads`); default = same as [uploads]
   bool barrierDismissible = true,
+  bool monthly = false, // true = Rs10 one-time month (30 uploads + 99 diamonds), false = Rs1 intro
+  int diamonds = 99,
 }) async {
   OfferVideo.warmUp(); // no-op when the dashboard already started it
   final r = await showDialog<bool>(
@@ -609,6 +611,8 @@ Future<bool> showSubscriptionOfferPopup(
       uploads: uploads,
       planUploads: planUploads ?? uploads,
       canClose: barrierDismissible,
+      monthly: monthly,
+      diamonds: diamonds,
     ),
   );
   OfferVideo.release();
@@ -622,12 +626,16 @@ class _SubscriptionOfferDialog extends StatelessWidget {
   final int uploads;
   final int planUploads;
   final bool canClose;
+  final bool monthly;
+  final int diamonds;
   const _SubscriptionOfferDialog({
     required this.intro,
     required this.plan,
     required this.uploads,
     required this.planUploads,
     this.canClose = true,
+    this.monthly = false,
+    this.diamonds = 99,
   });
 
   Widget _row(IconData icon, String text) => Padding(
@@ -672,26 +680,31 @@ class _SubscriptionOfferDialog extends StatelessWidget {
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  'Start for just \u20b9$intro',
+                                  monthly ? 'Get $planUploads uploads for \u20b9$plan' : 'Start for just \u20b9$intro',
                                   maxLines: 1,
                                   style: const TextStyle(color: UiColors.purpleDark, fontSize: 26, fontWeight: FontWeight.w800),
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              Text('for $uploads video uploads', style: const TextStyle(color: UiColors.textDim, fontSize: 14)),
-                              const SizedBox(height: 10),
-                              _row(Icons.file_upload_outlined, '$uploads uploads right away'),
-                              _row(Icons.autorenew_rounded, 'When they finish: \u20b9$plan autopay for the next $planUploads uploads'),
-                              _row(Icons.notifications_none_rounded, 'We notify you before every debit'),
-                              const SizedBox(height: 8),
                               Text(
-                                'Your 1-month period starts on the day the \u20b9$plan is debited, from the same payment method. '
-                                'Cancel anytime in Profile \u2192 Subscription.',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: UiColors.textDim, fontSize: 12, height: 1.4),
+                                monthly ? 'valid for 30 days' : 'for $uploads video uploads',
+                                style: const TextStyle(color: UiColors.textDim, fontSize: 14),
                               ),
+                              const SizedBox(height: 10),
+                              if (monthly) ...[
+                                _row(Icons.file_upload_outlined, '$planUploads uploads right away'),
+                                _row(Icons.diamond_outlined, '$diamonds diamonds for AI tools'),
+                                _row(Icons.verified_user_outlined, 'One-time payment, no autopay'),
+                              ] else ...[
+                                _row(Icons.file_upload_outlined, '$uploads uploads right away'),
+                                _row(Icons.verified_user_outlined, 'One-time payment, no autopay'),
+                                _row(Icons.workspace_premium_outlined, 'After that: \u20b9$plan for $planUploads uploads + $diamonds diamonds, only when you choose'),
+                              ],
                               const SizedBox(height: 14),
-                              AppButton(label: 'Pay \u20b9$intro & Start', onTap: () => Navigator.of(context).pop(true)),
+                              AppButton(
+                                label: monthly ? 'Pay \u20b9$plan' : 'Pay \u20b9$intro & Start',
+                                onTap: () => Navigator.of(context).pop(true),
+                              ),
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(false),
                                 child: const Text('Maybe later', style: TextStyle(color: UiColors.textDim, fontSize: 15, fontWeight: FontWeight.w700)),

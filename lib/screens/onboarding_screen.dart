@@ -1,161 +1,137 @@
 import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
-import '../theme/app_theme.dart';
-import '../providers/language_provider.dart';
 import '../widgets/app_brand_background.dart';
 import 'login_screen.dart';
 
+/// First launch: ONE simple Welcome screen (light page with the play-icon pattern, plum wave at the
+/// bottom, "Welcome / Your YouTube Growth Partner", round arrow button). The arrow opens the
+/// Sign Up page directly.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-// Now holds translation KEYS instead of display text — resolved via
-// context.tr() when building each page, so swiping/tapping between steps
-// always shows the currently selected language. iconAsset is the "real"
-// icon image for this step; icon is the fallback if the asset is missing.
-class _OnboardingStep {
-  final IconData icon;
-  final String iconAsset;
-  final String titleKey;
-  final String descKey;
-  const _OnboardingStep(this.icon, this.iconAsset, this.titleKey, this.descKey);
-}
-
-class _OnboardingScreenState extends State<OnboardingScreen> {
-  final _steps = const [
-    _OnboardingStep(Icons.cloud_upload_rounded, 'assets/onboarding_upload.png', 'onboarding_title_1', 'onboarding_desc_1'),
-    _OnboardingStep(Icons.phonelink_off_rounded, 'assets/onboarding_anywhere.png', 'onboarding_title_2', 'onboarding_desc_2'),
-    _OnboardingStep(Icons.auto_awesome_rounded, 'assets/onboarding_ai.png', 'onboarding_title_3', 'onboarding_desc_3'),
-  ];
-  int _step = 0;
-  late final PageController _pageController;
+class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerProviderStateMixin {
+  static const _plum = Color(0xFF4E0E52);
+  late final AnimationController _in;
+  bool _going = false;
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController();
+    _in = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..forward();
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _in.dispose();
     super.dispose();
   }
 
-  void _finish() async {
+  Future<void> _finish() async {
+    if (_going) return;
+    _going = true;
     await StorageService.setOnboarded();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
-  }
-
-  void _goToStep(int step) {
-    _pageController.animateToPage(step, duration: const Duration(milliseconds: 320), curve: Curves.easeOut);
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())); // Sign Up shows first
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppBrandBackground(
-      // Onboarding keeps the normal watermark when festival is off
-      // (same look as Splash). Festival image appears when festival mode is on.
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
+    final fade = CurvedAnimation(parent: _in, curve: Curves.easeOut);
+    final slide = Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _in, curve: Curves.easeOutCubic));
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAF9FC),
+      body: AppBrandBackground(
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final h = c.maxHeight;
+            final waveTop = h * 0.50;
+            return Stack(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(onPressed: _finish, child: Text(context.tr('skip'), style: TextStyle(color: context.surfaces.textDim))),
-                  ],
+                // plum wave
+                Positioned.fill(
+                  top: waveTop,
+                  child: CustomPaint(painter: _WavePainter(_plum)),
                 ),
-                // ---------------- Swipeable step pages ----------------
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _steps.length,
-                    onPageChanged: (i) => setState(() => _step = i),
-                    itemBuilder: (_, i) {
-                      final s = _steps[i];
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                // texts
+                Positioned(
+                  left: 32,
+                  right: 24,
+                  top: waveTop + 70,
+                  child: FadeTransition(
+                    opacity: fade,
+                    child: SlideTransition(
+                      position: slide,
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ⚠️ FIX (Boss request — "peeche jo blur plum
-                          // colour dikh raha hai use pura hatao"): the
-                          // RadialGradient glow container behind the icon
-                          // is removed entirely — this is now a plain,
-                          // fully transparent SizedBox, so nothing but the
-                          // icon itself renders. Icon itself bumped up
-                          // (96 → 116) to compensate visually since the
-                          // glow isn't there to fill the space anymore.
-                          SizedBox(
-                            width: 210,
-                            height: 210,
-                            child: Center(
-                              child: Image.asset(
-                                s.iconAsset,
-                                width: 116,
-                                height: 116,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => Container(
-                                  width: 116, height: 116,
-                                  decoration: const BoxDecoration(gradient: AppColors.gradient, shape: BoxShape.circle),
-                                  child: Icon(s.icon, size: 52, color: Colors.white),
-                                ),
-                              ),
+                          Text('Welcome',
+                              style: TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
+                          SizedBox(height: 8),
+                          Text.rich(
+                            TextSpan(
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                              children: [
+                                TextSpan(text: 'Your ', style: TextStyle(color: Colors.white)),
+                                TextSpan(text: 'YouTube Growth Partner', style: TextStyle(color: Color(0xFFE2B8EA))),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          Text(context.tr(s.titleKey), textAlign: TextAlign.center, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 10),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Text(context.tr(s.descKey), textAlign: TextAlign.center, style: TextStyle(color: context.surfaces.textDim)),
-                          ),
                         ],
-                      );
-                    },
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(_steps.length, (i) => GestureDetector(
-                    onTap: () => _goToStep(i),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _step ? 20 : 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: i == _step ? AppColors.purpleLight : context.surfaces.border,
-                        borderRadius: BorderRadius.circular(5),
                       ),
                     ),
-                  )),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      if (_step < _steps.length - 1) {
-                        _goToStep(_step + 1);
-                      } else {
-                        _finish();
-                      }
-                    },
-                    child: Text(_step == _steps.length - 1 ? context.tr('get_started') : context.tr('next')),
                   ),
                 ),
-                const SizedBox(height: 24),
+                // arrow button
+                Positioned(
+                  right: 28,
+                  bottom: 28 + MediaQuery.of(context).padding.bottom,
+                  child: FadeTransition(
+                    opacity: fade,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _finish,
+                        child: const SizedBox(
+                          width: 64,
+                          height: 64,
+                          child: Icon(Icons.arrow_forward_rounded, color: _plum, size: 30),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
+}
+
+class _WavePainter extends CustomPainter {
+  final Color color;
+  _WavePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Path()
+      ..moveTo(0, s.height * 0.10)
+      ..cubicTo(s.width * 0.22, -s.height * 0.02, s.width * 0.45, s.height * 0.02, s.width * 0.62, s.height * 0.12)
+      ..cubicTo(s.width * 0.78, s.height * 0.22, s.width * 0.92, s.height * 0.17, s.width, s.height * 0.12)
+      ..lineTo(s.width, s.height)
+      ..lineTo(0, s.height)
+      ..close();
+    canvas.drawPath(p, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _WavePainter old) => old.color != color;
 }

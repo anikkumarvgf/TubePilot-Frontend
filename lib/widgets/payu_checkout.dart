@@ -1,8 +1,61 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:payu_checkoutpro_flutter/payu_checkoutpro_flutter.dart';
 import 'package:payu_checkoutpro_flutter/PayUConstantKeys.dart';
 import '../services/api_service.dart';
+
+/// Step-by-step trace of the last payment attempt, saved to the phone IMMEDIATELY. If the app
+/// dies (native crash) while PayU is open, the next app start shows where it stopped - no PC /
+/// flutter run needed.
+final List<String> _traceLines = [];
+void _t(String s) {
+  debugPrint(s);
+  _traceLines.add('${DateTime.now().toIso8601String().substring(11, 19)} $s');
+  if (_traceLines.length > 40) _traceLines.removeAt(0);
+  SharedPreferences.getInstance().then((p) => p.setStringList('payu_trace_v1', List<String>.from(_traceLines)));
+}
+
+class PayuTrace {
+  static void start() {
+    _traceLines.clear();
+    _t('[PayU] ---- new attempt ----');
+  }
+
+  static Future<void> showDialogWith(BuildContext context, String title, List<String> lines) async {
+    final text = lines.join('\n');
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: SelectableText(text, style: const TextStyle(fontSize: 11.5))),
+        actions: [
+          TextButton(
+            onPressed: () => Clipboard.setData(ClipboardData(text: text)),
+            child: const Text('Copy'),
+          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  /// App start: the last attempt never finished -> the app was killed while paying. Show where.
+  static Future<void> showIfInterrupted(BuildContext context) async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final lines = p.getStringList('payu_trace_v1') ?? const <String>[];
+      await p.remove('payu_trace_v1');
+      if (lines.isEmpty || lines.any((l) => l.contains('FINISHED'))) return;
+      if (!context.mounted) return;
+      await showDialogWith(context, 'Last payment was interrupted', lines);
+    } catch (_) {}
+  }
+
+  static List<String> get lines => List<String>.from(_traceLines);
+}
 
 /// status: 'approved' | 'failed' | 'pending' | 'cancelled' | 'error'
 class PayuResult {
@@ -47,6 +100,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   }
 
   Future<PayuResult> _run(Future<Map<String, dynamic>> Function() createOrder) async {
+    PayuTrace.start();
     Map<String, dynamic> p;
     Map<String, dynamic>? si;
     try {
@@ -58,7 +112,8 @@ class PayuCheckout implements PayUCheckoutProProtocol {
       if (res['si'] is Map) si = Map<String, dynamic>.from(res['si'] as Map);
       _txnid = p['txnid'].toString();
     } catch (e) {
-      debugPrint('[PayU] create-order failed: $e');
+      _t('[PayU] create-order failed: $e');
+      _t('[PayU] FINISHED create-order error');
       return PayuResult('error', e.toString());
     }
 
@@ -66,7 +121,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
 
     // The SDK crashes / hangs on a null value, so every value is forced to a String.
     String v(dynamic x) => (x ?? '').toString();
-    final params = {
+    final Map<String, dynamic> params = {
       PayUPaymentParamKey.key: v(p['key']),
       PayUPaymentParamKey.amount: v(p['amount']),
       PayUPaymentParamKey.productInfo: v(p['productinfo']),
@@ -81,7 +136,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
       PayUPaymentParamKey.ios_surl: v(p['surl']),
       PayUPaymentParamKey.ios_furl: v(p['furl']),
     };
-    debugPrint('[PayU] params: key=${v(p['key']).isEmpty ? 'EMPTY' : 'ok'} amount=${v(p['amount'])} '
+    _t('[PayU] params: key=${v(p['key']).isEmpty ? 'EMPTY' : 'ok'} amount=${v(p['amount'])} '
         'env=${v(p['environment'])} surl=${v(p['surl'])} phone=${v(p['phone']).length} si=${si != null}');
     // Autopay details (subscription only). Server decides every value.
     if (si != null) {
@@ -104,10 +159,11 @@ class PayuCheckout implements PayUCheckoutProProtocol {
     };
 
     try {
-      debugPrint('[PayU] Opening checkout txn=$_txnid');
+      _t('[PayU] Opening checkout txn=$_txnid');
       _pro.openCheckoutScreen(payUPaymentParams: params, payUCheckoutProConfig: config);
     } catch (e) {
-      debugPrint('[PayU] open failed: $e');
+      _t('[PayU] open failed: $e');
+      _t('[PayU] FINISHED open failed');
       return PayuResult('error', 'Could not open checkout: $e');
     }
 
@@ -117,7 +173,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   Future<PayuResult> _confirm(String txnid, {int attempts = 6, String? sdkMsg}) async {
     try {
       for (var i = 1; i <= attempts; i++) {
-        debugPrint('[PayU] Verifying $txnid attempt $i/$attempts');
+        _t('[PayU] Verifying $txnid attempt $i/$attempts');
         final res = await _verify(txnid);
         final status = (res['status'] ?? '').toString();
         if (status == 'approved') return const PayuResult('approved');
@@ -131,6 +187,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   }
 
   void _finish(PayuResult r) {
+    _t('[PayU] FINISHED ${r.status} ${r.message}');
     if (_done != null && !_done!.isCompleted) _done!.complete(r);
   }
 
@@ -138,7 +195,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
   @override
   generateHash(Map response) async {
     final name = response['hashName']?.toString() ?? '';
-    debugPrint('[PayU] hash requested: $name');
+    _t('[PayU] hash requested: $name');
     try {
       final r = await ApiService.instance.payuHash(
         hashName: name,
@@ -152,7 +209,7 @@ class PayuCheckout implements PayUCheckoutProProtocol {
     } catch (e) {
       // Without an answer the SDK would show its loader forever. Give it an empty hash (it then
       // reports onError) and end the payment with a clear message.
-      debugPrint('[PayU] hash failed for $name: $e');
+      _t('[PayU] hash failed for $name: $e');
       try {
         _pro.hashGenerated(hash: {name: ''});
       } catch (_) {}
@@ -162,26 +219,26 @@ class PayuCheckout implements PayUCheckoutProProtocol {
 
   @override
   onPaymentSuccess(dynamic response) async {
-    debugPrint('[PayU] onPaymentSuccess');
+    _t('[PayU] onPaymentSuccess');
     _finish(await _confirm(_txnid)); // never trust the SDK alone
   }
 
   @override
   onPaymentFailure(dynamic response) async {
-    debugPrint('[PayU] onPaymentFailure: $response');
+    _t('[PayU] onPaymentFailure: $response');
     _finish(await _confirm(_txnid, attempts: 2, sdkMsg: 'Payment failed. Please try again.'));
   }
 
   @override
   onPaymentCancel(Map? response) async {
-    debugPrint('[PayU] onPaymentCancel');
+    _t('[PayU] onPaymentCancel');
     final r = await _confirm(_txnid, attempts: 1);
     _finish(r.status == 'pending' ? const PayuResult('cancelled', 'Payment cancelled.') : r);
   }
 
   @override
   onError(Map? response) async {
-    debugPrint('[PayU] onError: $response');
+    _t('[PayU] onError: $response');
     final r = await _confirm(_txnid, attempts: 1, sdkMsg: 'Checkout error: ${response ?? ''}');
     _finish(r.status == 'pending' ? PayuResult('error', 'Checkout error: ${response ?? ''}') : r);
   }

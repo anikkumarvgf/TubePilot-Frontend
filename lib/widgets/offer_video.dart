@@ -22,7 +22,7 @@ class OfferVideo {
     final c = VideoPlayerController.asset(asset, videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true));
     _ctrl = c;
     _init = c.initialize().then((_) {
-      c.setLooping(false); // the presenter speaks once; tap the video to replay
+      c.setLooping(true); // when the video ends it starts again by itself
       c.setVolume(1);
     }).catchError((Object e) {
       debugPrint('[OfferVideo] could not load $asset: $e');
