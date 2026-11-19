@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_provider.dart';
 import '../services/storage_service.dart';
@@ -41,10 +42,24 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
+  /// All "Allow" permission popups are asked on the splash screen (after the text has popped in),
+  /// so no permission popup lands on the Welcome / Sign Up screens. Already granted / permanently
+  /// denied permissions are skipped.
+  Future<void> _askPermissions() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 1000)); // let "Tube Pilot" pop in first
+      final st = await Permission.notification.status;
+      if (!st.isGranted && !st.isPermanentlyDenied) {
+        await Permission.notification.request();
+      }
+    } catch (_) {}
+  }
+
   Future<void> _decideNextScreen() async {
     final auth = context.read<AuthProvider>();
     await Future.wait([
       auth.loadSession(),
+      _askPermissions(), // "Allow" popups come HERE, on the splash screen
       Future.delayed(_minSplashDuration),
     ]);
     if (!mounted) return;

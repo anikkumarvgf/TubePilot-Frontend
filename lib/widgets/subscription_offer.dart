@@ -20,12 +20,14 @@ const String kSubscriptionActionShownKey = 'subscription_offer_action_shown_ms';
 /// Returns true if the user tapped "Pay ₹1 & Start" (payment screen was opened), so the
 /// caller can refresh its data. Returns false in every other case (not shown / skipped / error).
 Future<bool> showSubscriptionOfferIfNeeded(BuildContext context,
-    {bool onlyOnce = false}) async {
+    {bool onlyOnce = false, bool force = false}) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    if (onlyOnce) {
+    if (force) {
+      // shown right after the last free upload: no once / 24h gate
+    } else if (onlyOnce) {
       if (prefs.getBool(kSubscriptionOfferOnceKey) == true) return false;
     } else {
       final last = prefs.getInt(kSubscriptionActionShownKey);

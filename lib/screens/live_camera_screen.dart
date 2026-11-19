@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:apivideo_live_stream/apivideo_live_stream.dart';
+import 'package:flutter_video_live_stream/flutter_video_live_stream.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -37,7 +37,7 @@ class LiveCameraScreen extends StatefulWidget {
 enum _CamStage { loading, error, ready, starting, live }
 
 class _LiveCameraScreenState extends State<LiveCameraScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, ApiVideoLiveStreamEventsListener {
   ApiVideoLiveStreamController? _controller;
   final TextEditingController _titleCtrl = TextEditingController();
 
@@ -102,9 +102,43 @@ class _LiveCameraScreenState extends State<LiveCameraScreen>
     }
     LiveCameraScreen.active = false;
     WakelockPlus.disable();
+    _controller?.removeEventsListener(this);
     _controller?.stop();
     _controller?.dispose();
     super.dispose();
+  }
+
+  @override
+  void onConnectionSuccess() {
+    debugPrint('[CameraLive] RTMP connection success');
+  }
+
+  @override
+  void onConnectionFailed(String error) {
+    debugPrint('[CameraLive] RTMP connection failed: $error');
+    _rtmpError = error;
+    if (!_trying) {
+      _handleConnectionProblem(
+          _t('live_cam_connect_failed').replaceAll('%1', error));
+    }
+  }
+
+  @override
+  void onDisconnection() {
+    debugPrint('[CameraLive] RTMP disconnected');
+    if (!_trying) {
+      _handleConnectionProblem(_t('live_cam_conn_lost'));
+    }
+  }
+
+  @override
+  void onError(Exception error) {
+    debugPrint('[CameraLive] error: $error');
+    _rtmpError = error.toString();
+    if (!_trying) {
+      _handleConnectionProblem(
+          _t('live_cam_error').replaceAll('%1', '$error'));
+    }
   }
 
   // ---------------- lifecycle ----------------
@@ -188,37 +222,13 @@ class _LiveCameraScreenState extends State<LiveCameraScreen>
     try {
       final controller = ApiVideoLiveStreamController(
         initialAudioConfig: AudioConfig(),
-        initialVideoConfig: VideoConfig(
+        initialVideoConfig: VideoConfig.withBitrate(
           bitrate: 1000 * 1000,
-          resolution: Resolution.RESOLUTION_480,
+          resolution: PredefinedResolution.RESOLUTION_480.resolution,
           fps: 30,
         ),
-        onConnectionSuccess: () =>
-            debugPrint('[CameraLive] RTMP connection success'),
-        onConnectionFailed: (String error) {
-          debugPrint('[CameraLive] RTMP connection failed: $error');
-          _rtmpError = error;
-          if (!_trying) {
-            _handleConnectionProblem(
-                _t('live_cam_connect_failed').replaceAll('%1', error));
-          }
-        },
-        onDisconnection: () {
-          debugPrint('[CameraLive] RTMP disconnected');
-          if (_trying) {
-            return; // fallback mein hum khud stopStreaming bulate hain
-          }
-          _handleConnectionProblem(_t('live_cam_conn_lost'));
-        },
-        onError: (Exception e) {
-          debugPrint('[CameraLive] error: $e');
-          _rtmpError = e.toString();
-          if (!_trying) {
-            _handleConnectionProblem(
-                _t('live_cam_error').replaceAll('%1', '$e'));
-          }
-        },
       );
+      controller.addEventsListener(this);
       await controller.initialize();
       if (!mounted) {
         controller.dispose();
@@ -515,7 +525,7 @@ class _LiveCameraScreenState extends State<LiveCameraScreen>
 
   Future<void> _switchCamera() async {
     try {
-      await _controller?.switchCamera();
+      await _controller?.toggleCamera();
     } catch (e) {
       if (mounted) {
         showToast(context, context.tr('live_cam_switch_failed'), isError: true);

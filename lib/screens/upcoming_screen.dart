@@ -5,6 +5,7 @@ import '../providers/language_provider.dart';
 import '../widgets/common.dart';
 import '../widgets/brand_icons.dart';
 import '../widgets/app_brand_background.dart';
+import '../widgets/video_poster.dart';
 
 class UpcomingScreen extends StatefulWidget {
   final bool embedded;
@@ -170,7 +171,8 @@ class _UpcomingScreenState extends State<UpcomingScreen> with SingleTickerProvid
       (p) => (p['thumbnailUrl'] ?? '').toString().isNotEmpty,
       orElse: () => null,
     );
-    return withThumb != null ? withThumb['thumbnailUrl'].toString() : null;
+    if (withThumb != null) return withThumb['thumbnailUrl'].toString();
+    return videoPosterUrl(v); // no own thumbnail: first frame of the uploaded video
   }
 
   List<dynamic> _filtered(List<dynamic> videos) {

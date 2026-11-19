@@ -96,6 +96,11 @@ class ApiService {
     return data;
   }
 
+  // Generic calls used by the AI chat (/assistant/*, /analytics/*). Throws ApiException on error.
+  Future<Map<String, dynamic>> rawGet(String path) => _request(path);
+  Future<Map<String, dynamic>> rawPost(String path, [Map<String, dynamic>? body]) =>
+      _request(path, method: 'POST', body: body);
+
   Future<bool> _refreshAccessToken() async {
     try {
       final refreshToken = await StorageService.getRefreshToken();

@@ -608,14 +608,8 @@ class _UploadScreenState extends State<UploadScreen> {
       showToast(context, context.tr('up_select_platform_error'), isError: true);
       return;
     }
-    if (selectedPlatforms.contains('youtube')) {
-      final missingTitle = videos.any((v) => v.ytTitleCtrl.text.trim().isEmpty);
-      if (missingTitle) {
-        showToast(context, context.tr('up_youtube_title_required'),
-            isError: true);
-        return;
-      }
-    }
+    // Title is optional now: an empty title / description / tags is created by the AI from the video itself
+    // (backend utils/videoAnalyzer.js), for single and bulk uploads.
     if (scheduleEnabled && scheduledAt == null && !autoSlotting) {
       showToast(context, context.tr('up_pick_schedule_error'), isError: true);
       return;
@@ -674,6 +668,8 @@ class _UploadScreenState extends State<UploadScreen> {
           };
         }
 
+        // was this the last free upload? (then the Rs10 offer comes right after it)
+        final wasLastFree = freeUploadsRemaining <= 1 && diamondBalance < _diamondCostPerUpload;
         final upRes = await ApiService.instance.uploadVideo(
           videoPath: item.file.path,
           thumbnailPath: selectedPlatforms.contains('youtube')
@@ -701,6 +697,11 @@ class _UploadScreenState extends State<UploadScreen> {
           isSuccess: true,
         );
         _resetForm();
+        if (wasLastFree && mounted) {
+          await Future.delayed(const Duration(milliseconds: 900));
+          if (mounted) await showSubscriptionOfferIfNeeded(context, force: true);
+          if (mounted) _loadInitialData();
+        }
       } else {
         // -------- Bulk: /videos/bulk-upload — backend auto-slots across days --------
         final items = videos
@@ -730,6 +731,7 @@ class _UploadScreenState extends State<UploadScreen> {
             ? '${scheduledAt!.hour.toString().padLeft(2, '0')}:${scheduledAt!.minute.toString().padLeft(2, '0')}'
             : null;
 
+        final wasLastFreeBulk = freeUploadsRemaining <= videos.length && diamondBalance < _diamondCostPerUpload;
         final res = await ApiService.instance.bulkUploadVideos(
           videoPaths: videos.map((v) => v.file.path).toList(),
           platforms: selectedPlatforms.toList(),
@@ -753,6 +755,11 @@ class _UploadScreenState extends State<UploadScreen> {
                       .replaceFirst('%d', '$successCount'),
               isSuccess: true);
           _resetForm();
+          if (wasLastFreeBulk && mounted) {
+            await Future.delayed(const Duration(milliseconds: 900));
+            if (mounted) await showSubscriptionOfferIfNeeded(context, force: true);
+            if (mounted) _loadInitialData();
+          }
         } else {
           var msg = context.tr('up_partial_scheduled');
           msg = msg.replaceFirst('%d', '$successCount');

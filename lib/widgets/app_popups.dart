@@ -703,20 +703,21 @@ class _SubscriptionOfferDialog extends StatelessWidget {
                               FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  monthly ? 'Get $planUploads uploads for \u20b9$plan' : 'Start for just \u20b9$intro',
+                                  monthly ? 'Enjoying TubePilot?' : 'Start for just \u20b9$intro',
                                   maxLines: 1,
                                   style: const TextStyle(color: UiColors.purpleDark, fontSize: 26, fontWeight: FontWeight.w800),
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                monthly ? 'valid for 30 days' : 'for $uploads video uploads',
+                                monthly ? '$planUploads uploads + $diamonds diamonds for \u20b9$plan' : 'for $uploads video uploads',
                                 style: const TextStyle(color: UiColors.textDim, fontSize: 14),
                               ),
                               const SizedBox(height: 10),
                               if (monthly) ...[
                                 _row(Icons.file_upload_outlined, '$planUploads uploads right away'),
                                 _row(Icons.diamond_outlined, '$diamonds diamonds for AI tools'),
+                                _row(Icons.event_available_outlined, 'Valid for 30 days'),
                                 _row(Icons.verified_user_outlined, 'One-time payment, no autopay'),
                               ] else ...[
                                 _row(Icons.file_upload_outlined, '$uploads uploads right away'),

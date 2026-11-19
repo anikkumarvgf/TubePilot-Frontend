@@ -30,7 +30,7 @@ if (!releaseSigningConfigured) {
 
 android {
     namespace = "com.tubepilot.app"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -42,7 +42,7 @@ android {
     defaultConfig {
         applicationId = "com.tubepilot.app"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

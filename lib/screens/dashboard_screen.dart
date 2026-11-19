@@ -19,6 +19,8 @@ import '../widgets/app_nav.dart';
 import '../widgets/app_popups.dart';
 // Milestone achievement popup (subscribers / views card)
 import '../widgets/milestone_popup.dart';
+import '../widgets/chat_trail.dart';
+import 'chat_screen.dart';
 import 'upload_screen.dart';
 import 'upcoming_screen.dart';
 import 'analytics_screen.dart';
@@ -37,6 +39,7 @@ import 'live_stream_screen.dart';
 // Starts loading the Rs1 offer video early (fast popup)
 import '../widgets/offer_video.dart';
 import '../widgets/referral_dialog.dart';
+import '../widgets/video_poster.dart';
 import '../services/subscription_pay.dart';
 import '../widgets/payu_checkout.dart';
 
@@ -64,8 +67,40 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   // The tab index and the bottom bar live in AppNav / main.dart (one bar for the
   // whole app). This screen only shows the selected tab's content.
+  // Page 0 = AI chat (swipe RIGHT on the dashboard), page 1 = dashboard.
+  final PageController _pages = PageController(initialPage: 1);
+  bool _showTrail = false;
+  int _lastTab = 0;
+
   void _onNav() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // bottom bar tapped while the chat is open -> go back to the dashboard first
+    if (AppNav.instance.tab != _lastTab && _pages.hasClients && (_pages.page ?? 1) < 0.5) {
+      _pages.jumpToPage(1);
+    }
+    _lastTab = AppNav.instance.tab;
+    setState(() {});
+  }
+
+  void _goChat() => _pages.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  void _goDashboard() => _pages.animateToPage(1, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+
+  Future<void> _maybeShowTrail() async {
+    if (widget.freshSignup) {
+      // wait until the sign-up popups (referral / connect / welcome) are over
+      await Future.delayed(const Duration(seconds: 12));
+    } else {
+      await Future.delayed(const Duration(milliseconds: 3500));
+    }
+    if (!mounted || !await ChatSwipeTrail.shouldShow()) return;
+    if (DashboardCover.notifier.value || AppNav.instance.tab != 0) return;
+    setState(() => _showTrail = true);
+  }
+
+  void _closeTrail() {
+    if (!_showTrail) return;
+    ChatSwipeTrail.markSeen();
+    setState(() => _showTrail = false);
   }
 
   @override
@@ -74,6 +109,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     AppNav.instance.addListener(_onNav);
     AppNav.instance.setDashboardMounted(true);
     DashboardCover.notifier.value = widget.freshSignup;
+    _lastTab = AppNav.instance.tab;
+    _pages.addListener(() {
+      if (_showTrail && (_pages.page ?? 1) < 0.9) _closeTrail();
+    });
+    _maybeShowTrail();
   }
 
   @override
@@ -84,6 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _pages.dispose();
     AppNav.instance.removeListener(_onNav);
     AppNav.instance.dashboardRoute = null;
     AppNav.instance.setDashboardMounted(false);
@@ -123,9 +164,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           extendBody: false,
-          body: Stack(
+          body: PageView(
+            controller: _pages,
+            // chat swipe only on the dashboard home tab (other tabs keep their own gestures)
+            physics: AppNav.instance.tab == 0 ? const PageScrollPhysics() : const NeverScrollableScrollPhysics(),
+            children: [
+              ChatScreen(onBack: _goDashboard),
+              Stack(
             children: [
               IndexedStack(index: AppNav.instance.tab, children: screens),
+              // small edge handle: tap (or swipe right) to open the AI chat
+              if (AppNav.instance.tab == 0)
+                Positioned(
+                  left: 0,
+                  top: MediaQuery.of(context).size.height * 0.38,
+                  child: GestureDetector(
+                    onTap: _goChat,
+                    child: Container(
+                      width: 26,
+                      height: 54,
+                      decoration: const BoxDecoration(
+                        color: UiColors.purple,
+                        borderRadius: BorderRadius.horizontal(right: Radius.circular(16)),
+                      ),
+                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
+                ),
+              if (_showTrail) Positioned.fill(child: ChatTrailOverlay(onDismiss: _closeTrail)),
               // Right after sign-up: plain cover while Referral -> Connect -> Welcome popups run
               // on top (the dashboard stays mounted underneath, it runs that flow).
               ValueListenableBuilder<bool>(
@@ -134,6 +200,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? const Positioned.fill(child: ColoredBox(color: Color(0xFFFAF8FF)))
                     : const SizedBox.shrink(),
               ),
+            ],
+          ),
             ],
           ),
           // No bottomNavigationBar here: the bar is drawn once in main.dart
@@ -542,7 +610,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
               : ((p['caption'] ?? '').toString().isNotEmpty ? p['caption'] : 'Untitled'),
           'scheduledAt': p['scheduledAt'],
           'publishedAt': p['publishedAt'],
-          'thumbnailUrl': p['thumbnailUrl'] ?? '',
+          'thumbnailUrl': (p['thumbnailUrl'] ?? '').toString().isNotEmpty ? p['thumbnailUrl'] : (videoPosterUrl(v) ?? ''),
           'status': p['status'],
         });
       }
@@ -591,7 +659,7 @@ class _DashboardHomeState extends State<_DashboardHome> with WidgetsBindingObser
     final remaining = n(data?['remainingFreeUploads']) ?? 0;
     final explicit = n(data?['totalFreeUploads'] ?? data?['freeUploadsLimit'] ?? data?['monthlyFreeUploads']);
     final used = n(data?['usedFreeUploads'] ?? data?['freeUploadsUsed']);
-    final total = (explicit != null && explicit > 0) ? explicit : (used != null ? remaining + used : 20);
+    final total = (explicit != null && explicit > 0) ? explicit : (used != null ? remaining + used : 3);
     return (remaining: remaining, total: max(total, remaining));
   }
 
