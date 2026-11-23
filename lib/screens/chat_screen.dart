@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import '../services/auth_provider.dart';
 import '../widgets/app_decor.dart';
@@ -75,27 +75,15 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
   String? _scheduleIso; // null = now / auto
   bool _autoSlot = false;
   bool _awaitingHandle = false;
-  bool _auto = true; // upload without asking for approval (switch in the header)
-
-  Future<void> _loadAuto() async {
-    try {
-      final p = await SharedPreferences.getInstance();
-      if (mounted) setState(() => _auto = p.getBool('chat_auto_mode_v1') ?? true);
-    } catch (_) {}
-  }
-
-  Future<void> _setAuto(bool v) async {
-    setState(() => _auto = v);
-    try {
-      final p = await SharedPreferences.getInstance();
-      await p.setBool('chat_auto_mode_v1', v);
-    } catch (_) {}
-  }
+  // Auto upload (no approval) is decided from what the user SAYS ("bina approval ke upload karo").
+  bool _auto = false;
+  static final _autoWords = RegExp(
+      r'(bina|bina kisi|without)\s+(approval|permission|puchhe|poochhe)|approval\s+(ki\s+)?(zarurat|jarurat)\s+nahi|automatic|auto\s*upload|apne\s+aap|khud\s+(se\s+)?upload|seedha\s+upload|direct\s+upload',
+      caseSensitive: false);
 
   @override
   void initState() {
     super.initState();
-    _loadAuto();
     _ai('Namaste! Main TubePilot AI hoon. 🎬\nVideo daalo (＋ dabao) aur main title, description, tags aur schedule sab set kar dunga. '
         'Channel SEO, competitor analysis aur live stream bhi bol ke karwa sakte ho.',
         actions: [
@@ -226,6 +214,18 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     setState(() => _msgs.add(_Msg(user: true, text: text)));
     _scrollEnd();
 
+    // "bina approval ke / automatic upload karo" -> upload everything without asking for approval
+    if (_autoWords.hasMatch(text) && !_auto) {
+      _auto = true;
+      if (_stage == _Stage.idle || _stage == _Stage.askHint) {
+        _ai(_videos.isEmpty
+            ? 'Theek hai, bina approval ke khud upload karunga. Video daalo (＋).'
+            : 'Theek hai, bina approval ke khud upload karunga.');
+        if (_stage == _Stage.askHint) _askHint();
+        return;
+      }
+    }
+
     // user was asked for a competitor link
     if (_awaitingHandle) {
       final ref = _parseChannelRef(text);
@@ -266,6 +266,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     }
     _removeMsg(typing);
 
+    if (u['auto'] == true) _auto = true;
     final intent = (u['intent'] ?? 'chat').toString();
     final reply = (u['reply'] ?? '').toString();
 
@@ -418,7 +419,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
       when = auto || _videos.length > 1 ? 'Auto slot (best time)' : 'Abhi';
     }
     if (_auto) {
-      _ai('Auto mode ON: ${_videos.length} video • $when • YouTube. Upload shuru kar raha hoon...');
+      _ai('Bina approval: ${_videos.length} video • $when • YouTube. Upload shuru kar raha hoon...');
       _upload();
       return;
     }
@@ -434,6 +435,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
       _stage = _Stage.idle;
       _thumbPath = null;
       _scheduleIso = null;
+      _auto = false;
     });
     _ai('Theek hai, cancel kar diya.');
   }
@@ -521,6 +523,7 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
       _videos.clear();
       _thumbPath = null;
       _scheduleIso = null;
+      _auto = false;
       setState(() => _stage = _Stage.idle);
       if (mounted) await showSubscriptionOfferIfNeeded(context);
     } catch (e) {
@@ -674,42 +677,25 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     return Container(
       color: UiColors.bg,
       child: SafeArea(
-        bottom: false,
+        bottom: true,
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(color: UiColors.purple, shape: BoxShape.circle),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 19),
-                  ),
+                  const _BotLogo(size: 38),
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text('TubePilot AI',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: UiColors.purple)),
                   ),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Auto upload', style: TextStyle(fontSize: 10.5, color: UiColors.textDim, fontWeight: FontWeight.w700)),
-                      SizedBox(
-                        height: 26,
-                        child: Transform.scale(
-                          scale: 0.8,
-                          child: Switch(value: _auto, activeColor: UiColors.purple, onChanged: _setAuto),
-                        ),
-                      ),
-                    ],
-                  ),
-                  TextButton.icon(
+                  IconButton(
+                    tooltip: 'Dashboard',
                     onPressed: widget.onBack,
-                    icon: const Icon(Icons.dashboard_outlined, size: 18, color: UiColors.purple),
-                    label: const Text('Dashboard', style: TextStyle(color: UiColors.purple, fontWeight: FontWeight.w700)),
+                    icon: const Icon(Icons.dashboard_outlined, color: UiColors.purple),
                   ),
                 ],
               ),
@@ -731,12 +717,9 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
 
   Widget _bubble(_Msg m, {required bool isLast}) {
     if (m.typing) {
-      return const Align(
-        alignment: Alignment.centerLeft,
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 6),
-          child: SizedBox(width: 38, height: 18, child: LinearProgressIndicator(color: UiColors.purple, backgroundColor: UiColors.iconCircle)),
-        ),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 6),
+        child: Align(alignment: Alignment.centerLeft, child: _BotLogo(size: 30, active: true)),
       );
     }
     final isUser = m.user;
@@ -785,25 +768,17 @@ class _ChatScreenState extends State<ChatScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  Widget _aiAvatar() => Container(
-        width: 28,
-        height: 28,
-        decoration: const BoxDecoration(color: UiColors.purple, shape: BoxShape.circle),
-        child: const Icon(Icons.auto_awesome, color: Colors.white, size: 15),
-      );
+  Widget _aiAvatar() => const _BotLogo(size: 30);
 
-  // The user's real profile photo (from the account); first letter of the name when there is none.
+  // The user's profile letter (first letter of the name).
   Widget _userAvatar() {
     final user = context.read<AuthProvider>().user ?? {};
-    final avatar = (user['avatar'] ?? user['photo'] ?? user['picture'] ?? '').toString();
     final name = (user['username'] ?? user['name'] ?? '').toString().trim();
     final letter = name.isEmpty ? 'U' : name.substring(0, 1).toUpperCase();
-    final isUrl = avatar.startsWith('http');
     return CircleAvatar(
-      radius: 14,
+      radius: 15,
       backgroundColor: UiColors.purple,
-      backgroundImage: isUrl ? NetworkImage(avatar) : null,
-      child: isUrl ? null : Text(letter, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800)),
+      child: Text(letter, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
     );
   }
 
@@ -991,6 +966,69 @@ class _InfoCard extends StatelessWidget {
         _list(bulletsTitle, bullets),
         _list(bullets2Title, bullets2),
       ]),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- animated logo
+/// The real TubePilot logo (assets/splash.png) with a soft breathing pulse and a
+/// colour ring that spins while the bot is thinking ([active]) - like Gemini's sparkle.
+class _BotLogo extends StatefulWidget {
+  final double size;
+  final bool active;
+  const _BotLogo({required this.size, this.active = false});
+  @override
+  State<_BotLogo> createState() => _BotLogoState();
+}
+
+class _BotLogoState extends State<_BotLogo> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.size;
+    return SizedBox(
+      width: size + 6,
+      height: size + 6,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) {
+          final pulse = 1 + 0.06 * math.sin(_c.value * 2 * math.pi);
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              if (widget.active)
+                Transform.rotate(
+                  angle: _c.value * 2 * math.pi,
+                  child: Container(
+                    width: size + 6,
+                    height: size + 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: SweepGradient(colors: [Color(0x007A2C8C), UiColors.purple, Color(0xFF52B3A0), Color(0x007A2C8C)]),
+                    ),
+                  ),
+                ),
+              Transform.scale(
+                scale: widget.active ? 1.0 : pulse,
+                child: Container(
+                  width: size,
+                  height: size,
+                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  padding: EdgeInsets.all(size * 0.12),
+                  child: ClipOval(child: Image.asset('assets/splash.png', fit: BoxFit.contain)),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

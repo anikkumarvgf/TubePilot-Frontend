@@ -107,3 +107,34 @@ class _ChatTrailOverlayState extends State<ChatTrailOverlay> with SingleTickerPr
     );
   }
 }
+
+/// Caption shown while the mock swipe demo plays (chat slides to the dashboard and back).
+class ChatDemoCaption extends StatelessWidget {
+  const ChatDemoCaption({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: UiColors.purple,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 14, offset: Offset(0, 5))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.swipe_rounded, color: Colors.white, size: 26),
+            SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'Aise slide karke dashboard aur chat badlo',
+                style: TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

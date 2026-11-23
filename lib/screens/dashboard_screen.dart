@@ -68,8 +68,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // The tab index and the bottom bar live in AppNav / main.dart (one bar for the
   // whole app). This screen only shows the selected tab's content.
   // Page 0 = AI chat (swipe RIGHT on the dashboard), page 1 = dashboard.
-  final PageController _pages = PageController(initialPage: 1);
-  bool _showTrail = false;
+  final PageController _pages = PageController(initialPage: 0); // chat is ALWAYS the first page
+  bool _chatBarHidden = false; // the bottom bar is hidden while the chat page is on screen
+
+  // chat page (page < 0.5) -> hide the global bottom bar, dashboard -> show it
+  void _syncBar() {
+    final onChat = !_pages.hasClients || (_pages.page ?? 0) < 0.5;
+    if (onChat == _chatBarHidden) return;
+    _chatBarHidden = onChat;
+    if (onChat) {
+      AppNav.instance.pushHide();
+    } else {
+      AppNav.instance.popHide();
+    }
+  }
+
+  bool _showTrail = false; // true while the mock swipe demo plays
   int _lastTab = 0;
 
   void _onNav() {
@@ -85,22 +99,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _goChat() => _pages.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   void _goDashboard() => _pages.animateToPage(1, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
 
-  Future<void> _maybeShowTrail() async {
-    if (widget.freshSignup) {
-      // wait until the sign-up popups (referral / connect / welcome) are over
-      await Future.delayed(const Duration(seconds: 12));
-    } else {
-      await Future.delayed(const Duration(milliseconds: 3500));
-    }
+  // Shown ONCE: the chat slides over to the dashboard and back by itself (a real swipe,
+  // played for the user) with a small caption, so the user learns the gesture.
+  Future<void> _runSwipeDemo() async {
+    await Future.delayed(widget.freshSignup ? const Duration(seconds: 12) : const Duration(milliseconds: 1600));
     if (!mounted || !await ChatSwipeTrail.shouldShow()) return;
-    if (DashboardCover.notifier.value || AppNav.instance.tab != 0) return;
+    if (DashboardCover.notifier.value || AppNav.instance.tab != 0 || !_pages.hasClients) return;
+    await ChatSwipeTrail.markSeen();
     setState(() => _showTrail = true);
-  }
-
-  void _closeTrail() {
-    if (!_showTrail) return;
-    ChatSwipeTrail.markSeen();
-    setState(() => _showTrail = false);
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    await _pages.animateToPage(1, duration: const Duration(milliseconds: 1100), curve: Curves.easeInOut);
+    await Future.delayed(const Duration(milliseconds: 1500));
+    if (!mounted) return;
+    await _pages.animateToPage(0, duration: const Duration(milliseconds: 1100), curve: Curves.easeInOut);
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() => _showTrail = false);
   }
 
   @override
@@ -110,10 +124,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     AppNav.instance.setDashboardMounted(true);
     DashboardCover.notifier.value = widget.freshSignup;
     _lastTab = AppNav.instance.tab;
-    _pages.addListener(() {
-      if (_showTrail && (_pages.page ?? 1) < 0.9) _closeTrail();
-    });
-    _maybeShowTrail();
+    _chatBarHidden = true; // starts on the chat page
+    AppNav.instance.pushHide();
+    _pages.addListener(_syncBar);
+    _runSwipeDemo();
   }
 
   @override
@@ -124,6 +138,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _pages.removeListener(_syncBar);
+    if (_chatBarHidden) AppNav.instance.popHide();
     _pages.dispose();
     AppNav.instance.removeListener(_onNav);
     AppNav.instance.dashboardRoute = null;
@@ -166,6 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           extendBody: false,
           body: PageView(
             controller: _pages,
+            allowImplicitScrolling: true, // keeps the dashboard built next to the chat (its start-up popups must run)
             // chat swipe only on the dashboard home tab (other tabs keep their own gestures)
             physics: AppNav.instance.tab == 0 ? const PageScrollPhysics() : const NeverScrollableScrollPhysics(),
             children: [
@@ -173,25 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Stack(
             children: [
               IndexedStack(index: AppNav.instance.tab, children: screens),
-              // small edge handle: tap (or swipe right) to open the AI chat
-              if (AppNav.instance.tab == 0)
-                Positioned(
-                  left: 0,
-                  top: MediaQuery.of(context).size.height * 0.38,
-                  child: GestureDetector(
-                    onTap: _goChat,
-                    child: Container(
-                      width: 26,
-                      height: 54,
-                      decoration: const BoxDecoration(
-                        color: UiColors.purple,
-                        borderRadius: BorderRadius.horizontal(right: Radius.circular(16)),
-                      ),
-                      child: const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 22),
-                    ),
-                  ),
-                ),
-              if (_showTrail) Positioned.fill(child: ChatTrailOverlay(onDismiss: _closeTrail)),
+              if (_showTrail) const Positioned(top: 60, left: 0, right: 0, child: IgnorePointer(child: ChatDemoCaption())),
               // Right after sign-up: plain cover while Referral -> Connect -> Welcome popups run
               // on top (the dashboard stays mounted underneath, it runs that flow).
               ValueListenableBuilder<bool>(
